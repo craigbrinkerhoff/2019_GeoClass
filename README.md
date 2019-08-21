@@ -2,5 +2,5 @@
 <br><br>
 Craig Brinkerhoff
 <br>
-Global River Geomoprhlogy Classification
+Global River Geomorphology Classification for Assessing River Form and Constraining Remote River Discharge Estimation Algorithms
 <br>

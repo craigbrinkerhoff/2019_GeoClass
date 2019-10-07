@@ -126,14 +126,12 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   Qbhat_func <- function(x) {-1.8699 + 1.8871*mean(log10(x))} #r2 0.89
   
   #hat variables
-  bhat <- apply(W_obs, 1, bhat_func)
   ahat <- apply(W_obs, 1, ahat_func)
-  a0hat <- apply(W_obs, 1, a0Hat_func)
+  #a0hat <- apply(W_obs, 1, a0Hat_func)
   Wbhat <- apply(W_obs, 1, Wbhat_func)
   Dbhat <- apply(W_obs, 1, Dbhat_func)
-  rhat <- apply(W_obs, 1, rhat_func)
   Qbhat <- apply(W_obs, 1, Qbhat_func)
-
+  
   #AHG/AMHG Flag
   H_obs = rowMeans(ncvar_get(data_in, 'XS_Timeseries/H'))
   xs_bnds = ncvar_get(data_in, 'XS_Timeseries/X')
@@ -149,16 +147,52 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   else {amhgFlag = 0}
   
   #assign river class to reach
-  #classMedians = c(1.36, 1.51, 1.62, 1.69, 1.85, 1.95, 2.16, 2.52) #50TH PERCENTILE: c(1.15, 1.36, 1.48, 1.54, 1.66, 1.80, 2.00, 2.28)
-  #reachClasses <- c(0,1)
-  #for (i in 1:nrow(W_obs)) {
-  #  meanW = log10(mean(W_obs[i,]))
-  #  reachClasses[i] = which(abs(classMedians-meanW)==min(abs(classMedians-meanW)))
-  #}
+  classMedians = c(1.15, 1.36, 1.48, 1.54, 1.66, 1.80, 2.00, 2.28) #75th percentile c(1.36, 1.51, 1.62, 1.69, 1.85, 1.95, 2.16, 2.52) #
+  reachClasses <- c(0,1)
+ for (i in 1:nrow(W_obs)) {
+    meanW = log10(mean(W_obs[i,]))
+    reachClasses[i] = which(abs(classMedians-meanW)==min(abs(classMedians-meanW)))
+ }
+  reachClasses = mean(reachClasses)
+#  reachClasses <- which(abs(classMedians-log10(Q_prior))==min(abs(classMedians-log10(Q_prior))))#mean(reachClasses)
   
+  rhat <- rep(RClass[reachClasses, 7], nrow(W_obs))#apply(W_obs, 1, rhat_func)
+  bhat <- rep(BClass[reachClasses, 7], nrow(W_obs))#apply(W_obs, 1, bhat_func)
+  a0hat <- rep(A0Class[reachClasses, 7], nrow(W_obs))
+  
+  #determine upper and lower bounds using 2.698*sigma
+  upperB <- BClass[reachClasses, 4]*2.698+BClass[reachClasses, 8]
+  upperA0 <- A0Class[reachClasses, 4]*2.698+A0Class[reachClasses, 8]
+  lowerA0 <- A0Class[reachClasses, 4]*-2.698+A0Class[reachClasses, 6]
+  upperWb <- WbClass[reachClasses, 4]*2.698+WbClass[reachClasses, 8]
+  lowerWb <- WbClass[reachClasses, 4]*-2.698+WbClass[reachClasses, 6]
+  upperDb <- DbClass[reachClasses, 4]*2.698+DbClass[reachClasses, 8]
+  lowerDb <- DbClass[reachClasses, 4]*-2.698+DbClass[reachClasses, 6]
+  upperR <- RClass[reachClasses, 4]*2.698+RClass[reachClasses, 8]
+  lowerR <- RClass[reachClasses, 4]*-2.698+RClass[reachClasses, 6]
+  
+  #make sure b isn't going above 1
+  upperB <- ifelse(upperB > 1, 1, upperB)
+  
+  #braided river flag
+  if (file == 'Tanana.nc' | file == 'Jamuna.nc' | file == 'Platte.nc'){
+    upperR <- 0
+    lowerR <- -10
+    rhat <- rep(-0.1082, nrow(W_obs))
+    bhat <- rep(0.405, nrow(W_obs))
+  }
+  
+  #assign priors
   priors <- bam_priors(bamdata = bamdata, logQ_sd = cv2sigma(1), 
-                       b_hat=bhat, logWb_hat = Wbhat, logDb_hat = Dbhat, logr_hat = rhat, loga_hat = ahat, logA0_hat = a0hat, ahg_flag = amhgFlag)
-
+                       b_hat=bhat, logWb_hat = Wbhat, logDb_hat = Dbhat, logr_hat = rhat, loga_hat = ahat, logA0_hat = a0hat, 
+                       lowerbound_A0 = 10^lowerA0, upperbound_A0 = 10^upperA0,
+                       lowerbound_b = 0, upperbound_b = upperB,
+                       lowerbound_logWb = lowerWb, upperbound_logWb = upperWb,
+                       lowerbound_logDb = lowerDb, upperbound_logDb = upperDb,
+                       lowerbound_logr = lowerR, upperbound_logr = upperR,
+                       b_sd=BClass[reachClasses, 4], logA0_sd=A0Class[reachClasses, 4], logWb_sd = WbClass[reachClasses, 4], logDb_sd = DbClass[reachClasses, 4], logr_sd = RClass[reachClasses, 4],
+                       ahg_flag = amhgFlag)
+  
   #custom priors post Hagemann et al 2017
   priors$lowerbound_logQc=0.01
   priors$upperbound_logn=log(0.05)
@@ -185,7 +219,7 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   }
   
   #rivers are big reaches= b sd should be up
-  priors$b_sd=0.2
+ # priors$b_sd=0.2
   
   #measurment error
   #error_table=read.csv('D:/Box Sync/Pepsi 2/Pepsi2Uncertainties.csv')
@@ -265,6 +299,18 @@ Db <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_cl
 r <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsR.csv')
 a <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsA.csv')
 
+WbClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsWbClass.csv')
+DbClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsDbClass.csv')
+RClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsRClass.csv')
+BClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsBClass.csv')
+A0Class <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsA0Class.csv')
+
+WbClass <- WbClass[order(WbClass$clusterGeomorphIndex),]
+DbClass <- DbClass[order(DbClass$clusterGeomorphIndex),]
+RClass <- RClass[order(RClass$clusterGeomorphIndex),]
+BClass <- BClass[order(BClass$clusterGeomorphIndex),]
+A0Class <- A0Class[order(A0Class$clusterGeomorphIndex),]
+
 #Compile and run my BAM stan model
 craig_model <- stan_model("C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//master.stan", model_name = 'craig_model')
 
@@ -305,7 +351,7 @@ mintime=3
 
 for (phase in allpepsi2){
 setwd(phase)
-output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//test_switch//')
+output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//test_river_type_5//')
 phase_files= list.files(pattern = "\\.nc$")
 # phase_files=phase_files[1]
 #output_string= paste(training1,'metricscv2.csv',sep="")
@@ -327,21 +373,20 @@ for (i in 1:(length(phase_files))) {
   print('river done')
 }
 
-output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//')
+output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//test_river_type_5//')
 
 #join and plot
 library(readr)
 library(reshape2)
 library(plyr)
-myfiles = list.files(paste(output_directory, "Pepsi1_Bam_defaults/", sep=''), pattern="*.csv", full.names = TRUE)
-bam_stats <- ldply(myfiles, read_csv)
-bam_stats$river <- phase_files
-myfiles = list.files(paste(output_directory, "Pepsi2a_testswitch//", sep=''), pattern="*.csv", full.names = TRUE)
+#myfiles = list.files(paste(output_directory, "defaults//", sep=''), pattern="*.csv", full.names = TRUE)
+#bam_stats <- ldply(myfiles, read_csv)
+#bam_stats$river <- phase_files
+bam_stats <- read.table('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//defaults//Pepsi1_2_defaults.txt', sep='\t')
+myfiles = list.files(output_directory, pattern="*.csv", full.names = TRUE)
 temp <- ldply(myfiles, read_csv)
+temp$river <- phase_files
 bam_stats <- merge(bam_stats, temp, by='river')#cbind(bam_stats, temp)
-
-bam_stats <- bam_stats[, -1]
-bam_stats <- bam_stats[, -11]
 
 bam_stats$NSE_diff <- bam_stats$NSEswitch - bam_stats$NSE
 bam_stats$NRMSE_diff <- bam_stats$NRMSEswitch - bam_stats$NRMSE
@@ -351,7 +396,7 @@ write.table(bam_stats, paste(output_directory, 'comparisonstats.txt', sep=''), s
 
 plot <- melt(bam_stats)
 
-ggplot(filter(plot, (variable == 'NSE' | variable == 'NSEswitch')& river != 'Tanana.nc'), aes(x=river, y=value, fill=variable)) + 
+ggplot(filter(plot, variable == 'NSE' | variable == 'NSEswitch'), aes(x=river, y=value, fill=variable)) + 
   geom_bar(position="dodge", stat='identity') +
   scale_color_discrete() +
   theme(axis.text.x = element_text(angle = 90))

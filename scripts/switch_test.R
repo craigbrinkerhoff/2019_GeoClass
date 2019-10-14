@@ -125,6 +125,7 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   rhat_func <- function(x){0.6185-1.9097* sd(log10(x))+0.0420*mean(log10(x))} #r2 0.421
   Qbhat_func <- function(x) {-1.8699 + 1.8871*mean(log10(x))} #r2 0.89
   nhat_func <- function(x) {-0.0892+0.4037*log10(mean(x))} #r2: 0.636
+  bhat_func_old <- function(x) {0.02161+0.4578*sd(log10(x))} #mark's b model
   
   #hat variables
   a0hat <- apply(W_obs, 1, a0Hat_func)
@@ -132,7 +133,7 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   Dbhat <- apply(W_obs, 1, Dbhat_func)
   Qbhat <- apply(W_obs, 1, Qbhat_func)
   nhat <- nhat_func(S_obs)
-  bhat <- apply(W_obs, 1, bhat_func)
+  bhat <- apply(W_obs, 1, bhat_func_old)
   rhat <- apply(W_obs, 1, rhat_func)
   
   #AHG/AMHG Flag
@@ -144,9 +145,10 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   }
   Dehat <- 19*10^(Dbhat)*S_obs_model
   
+  amhgFlag = 0
   regimeS <- 0.44*Dehat^(1.15)*Qbhat^(-0.46)
   regimeFit <- summary(lm(regimeS~S_obs_model))$r.squared
-  if (regimeFit < 0.90) {amhgFlag = 1}
+  if (regimeFit > 0.90) {amhgFlag = 1}
   else {amhgFlag = 0}
   
   #priors = bam_priors(bamdata)
@@ -170,14 +172,14 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   }
   
   priors <- bam_priors(bamdata = bamdata, logQ_sd = cv2sigma(1), 
-                       b_hat=bhat, logA0_hat = a0hat, logn_hat = nhat, logr_hat = rhat, logWb_hat = Wbhat, logDb_hat = Dbhat,
-                       lowerbound_A0 = 10^A0[3,2], upperbound_A0 = 10^A0[7,2],
+                       logr_hat = rhat, logWb_hat = Wbhat, logDb_hat = Dbhat, b_hat = bhat,#logn_hat = nhat, b_hat=bhat, logA0_hat = a0hat, 
+                       #lowerbound_A0 = 10^A0[3,2], upperbound_A0 = 10^A0[7,2],
                        lowerbound_logr = lowerR, upperbound_logr=upperR,
                        lowerbound_logWb = Wb[3,2], upperbound_logWb=Wb[7,2],
                        lowerbound_logDb = Db[3,2], upperbound_logDb=Db[7,2],
-                       lowerbound_b = 0, upperbound_b = B[7,2],
-                       lowerbound_logn = N[3,2], upperbound_logn=N[7,2],
-                       b_sd=B[2,2], logA0_sd=A0[2,2], logn_sd=N[2,2], logr_sd=r[2,2], logWb_sd = Wb[2,2], logDb_sd=Db[2,2])
+                      # lowerbound_b = B[3,2], upperbound_b = B[7,2],
+                      # lowerbound_logn = N[3,2], upperbound_logn=N[7,2],
+                      logr_sd=SDs[3,2], logWb_sd = SDs[1,2], logDb_sd=SDs[2,2])#,  b_sd=SDs[6,2], logA0_sd=SDs[5,2], logn_sd=SDs[4,2])
   
   
   #custom priors post Hagemann et al 2017
@@ -241,29 +243,27 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   ##run it
    #p_int_river <- ifelse(file != 'Ohio.nc', as.numeric(p_int[which(p_int[,2]==file)]), -9998)
   #  p_int_river <- ifelse(file == 'Tanana.nc', 0, p_int_river)
-  #switch <- 0
+  switch <- 0
   # if ((p_int_river > 0.15 & sd(log10(W_obs)) > 0.1)|p_int_river==-9998){
-  #if (amhgFlag == 1){
+  if (amhgFlag == 1){
     run_bam_Craig= bam_estimate(bamdata=bamdata, bampriors = priors, stanmodel = craig_model, variant = 'manning_amhg')
-   # switch <- 1
-  #}
-  #else {
-  #  run_bam_Craig= bam_estimate(bamdata=bamdata, variant = 'manning')
-  #}
+    switch <- 1
+  }
+  else {
+    run_bam_Craig= bam_estimate(bamdata=bamdata, bampriors = priors, stanmodel = craig_model, variant = 'manning')
+  }
   
   qobs=colMeans(Q_obs)
   
-  bam_stats_Craig=bam_validate(run_bam_Craig, qobs, stats = c("RRMSE", "NRMSE", "NSE"))
+  bam_stats_Craig=bam_validate(run_bam_Craig, qobs, stats = c("RRMSE", "NRMSE", "NSE", "rBIAS"))
   
   #outpt error metrics
   statistics <- data.frame()
   statistics <- rbind(statistics, bam_stats_Craig$stats)
-  #colnames(statistics) <- c("RRMSEcraig", "NRMSEcraig", "NSEcraig")
-  colnames(statistics) <- c("RRMSEswitch", "NRMSEswitch", "NSEswitch")
+  colnames(statistics) <- c("RRMSE", "NRMSE", "NSE", "rBIAS")
   
-  #return(c(file,round(bam_stats$stats,2)) )
   write.csv(statistics,output_string)
-  #write.csv(switch, output_string2)
+  print(switch)
   return(statistics)
   
 }
@@ -285,7 +285,7 @@ mintime=3
 
 for (phase in allpepsi2){
   setwd(phase)
-  output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//manning_amhg_phy_brink19_priors//')
+  output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//new_physics_old_priors_correctSD//')
   phase_files= list.files(pattern = "\\.nc$")
   # phase_files=phase_files[1]
   #output_string= paste(training1,'metricscv2.csv',sep="")
@@ -301,7 +301,7 @@ for (phase in allpepsi2){
   }
 }
 
-p_int <- as.matrix(read.table('C:\\Users\\cbrinkerhoff\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\p_int.txt', sep='\t', header=TRUE))
+#p_int <- as.matrix(read.table('C:\\Users\\cbrinkerhoff\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\p_int.txt', sep='\t', header=TRUE))
 
 #prior distributions
 B <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsB.csv')
@@ -310,6 +310,7 @@ A0 <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_cl
 Db <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsDb.csv')
 Wb <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsWb.csv')
 r <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsR.csv')
+SDs <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorSDs.csv')
 
 #Compile and run my BAM stan model
 craig_model <- stan_model("C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//master.stan", model_name = 'craig_model')
@@ -330,50 +331,20 @@ test_priors <- options_manager(paramnames=c("lowerbound_logQ", "upperbound_logQ"
                                lowerbound_logn = -4.6, upperbound_logn = -1.5,
                                lowerbound_logQc = 0, upperbound_logQc=10,
                                lowerbound_logWc = 1, upperbound_logWc=8,
-                               lowerbound_b = 0, upperbound_b = 0,
+                               lowerbound_b = 0.01, upperbound_b = 0.8,
                                lowerbound_logWb = 0, upperbound_logWb = 0,
                                lowerbound_logDb = 0, upperbound_logDb = 0,
                                lowerbound_logr = 0, upperbound_logr = 0,
                                lowerbound_loga = 0, upperbound_loga = 0,
                                sigma_man=0.25, sigma_amhg = 0.22,
                                logQc_hat=bam_settings('logQc_hat'), logWc_hat=bam_settings('logWc_hat'),
-                               b_hat=0, logA0_hat = 0, logn_hat = 0,
+                               b_hat=bam_settings('b_hat'), logA0_hat = bam_settings('logA0_hat'), logn_hat = -3.5,
                                logWb_hat = 0, logDb_hat = 0, logr_hat = 0, loga_hat = 0,
-                               logQ_sd=0, logQc_sd = 0.8325546, logWc_sd=4.712493, b_sd=0, logA0_sd=0,
-                               logn_sd=0, logWb_sd = 0, logDb_sd = 0, logr_sd = 0, loga_sd = 0,
+                               logQ_sd=0, logQc_sd = 0.8325546, logWc_sd=4.712493, b_sd=0.05, logA0_sd=0.5,
+                               logn_sd=0.25, logWb_sd = 0, logDb_sd = 0, logr_sd = 0, loga_sd = 0,
                                Werr_sd=10, Serr_sd=0.00001, dAerr_sd=10)
 
 for (i in 1:(length(phase_files))) {
   statis <- batchbam(phase_files[i], output_directory, errorflag, minxs, mintime)
   print('river done')
 }
-
-
-
-
-
-
-#---------------------------------------------------------------------------------------------------
-output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//')
-
-#join and plot
-library(readr)
-library(reshape2)
-library(plyr)
-myfiles = list.files(paste(output_directory, "manning_amhg_hagemann17_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
-bam_stats <- ldply(myfiles, read_csv)
-bam_stats$river <- phase_files
-myfiles = list.files(paste(output_directory, "manning_amhg_phy_brink19_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-temp <- ldply(myfiles, read_csv)
-temp$river <- phase_files
-bam_stats <- merge(bam_stats, temp, by='river')#cbind(bam_stats, temp)
-
-colnames(bam_stats) <- c('River', 'X1.x', 'RRMSEmark', 'NRMSEmark', 'NSEmark', 'X1.y', 'RRMSEbrinkPhy', 'NRMSEbrinkPhy', 'NSEbrinkPhy')
-
-plot <- melt(bam_stats)
-
-ggplot(filter(plot, variable == 'NRMSEmark' | variable == 'NRMSEbrinkPhy'), aes(x=River, y=value, fill=variable)) + 
-  geom_bar(position="dodge", stat='identity') +
-  scale_color_discrete() +
-  theme(axis.text.x = element_text(angle = 90))
-

@@ -30,14 +30,15 @@ colnames(old_old_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'river')
 old_old_regime$Type <- rep('Old_old_regime', nrow(old_old_regime))
 old_old_regime$order <- rep(2, nrow(old_old_regime))
 
-old_new_regime = list.files(paste(output_directory, "old_physics_new_priors_correctSD//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
+old_new_regime = list.files(paste(output_directory, "old_physics_new_priors_correctN_correctSD//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
 old_new_regime <- ldply(old_new_regime, read_csv)
+old_new_regime = old_new_regime[,-5]
 old_new_regime$river <- phase_files
 colnames(old_new_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'river')
 old_new_regime$Type <- rep('Old_new_regime', nrow(old_new_regime))
 old_new_regime$order <- rep(3, nrow(old_new_regime))
 
-new_old_regime = list.files(paste(output_directory, "new_physics_old_priors_correctSD//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
+new_old_regime = list.files(paste(output_directory, "new_physics_new_priors_correctSD//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
 new_old_regime <- ldply(new_old_regime, read_csv)
 new_old_regime = new_old_regime[,-5]
 new_old_regime$river <- phase_files
@@ -45,7 +46,7 @@ colnames(new_old_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'river')
 new_old_regime$Type <- rep('New_old_regime', nrow(new_old_regime))
 new_old_regime$order <- rep(4, nrow(new_old_regime))
 
-new_new_regime = list.files(paste(output_directory, "new_physics_new_priors_correctSD//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
+new_new_regime = list.files(paste(output_directory, "new_physics_new_priors_correctN_correctSD//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
 new_new_regime <- ldply(new_new_regime, read_csv)
 new_new_regime = new_new_regime[,-5]
 new_new_regime$river <- phase_files
@@ -65,12 +66,12 @@ ggplot(plot, aes(x=metric, y = value, fill=Type)) +
   scale_fill_brewer(palette="Dark2")
 
 
-ggplot(filter(plot, metric == 'NSE'), aes(x=river, y=(value), fill=Type)) + 
+ggplot(filter(plot, metric == 'NRMSE'), aes(x=river, y=(value), fill=Type)) + 
   geom_bar(position="dodge", stat='identity') +
   scale_color_discrete() +
-  coord_cartesian(ylim = c(-1, 1))+
+ # coord_cartesian(ylim = c(-1, 1))+
   theme(axis.text.x = element_text(angle = 90)) +
   scale_fill_brewer(palette='Dark2')
 
 
-stats <- bam_stats %>% group_by(Type) %>% summarise(median = mean(NSE))
+stats <- bam_stats %>% group_by(Type) %>% summarise(median = median(NSE))

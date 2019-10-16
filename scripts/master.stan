@@ -1,6 +1,4 @@
 //Craig BAM stan model
-  //Basically, replace Wc and Qc priors with an 'a' prior that is the physical expression for AHG a, from
-    //Brinkerhoff, et al. 2019 and Dingman, 2007
 
 functions {
   // Conversion from array to vector takes place by row.
@@ -142,8 +140,6 @@ data {
   real upperbound_logDb;
   real lowerbound_logr;
   real upperbound_logr;
-  real upperbound_loga;
-  real lowerbound_loga;
 
   // *Known* likelihood parameters
   vector<lower=0>[nt] sigma_man[nx]; // Manning error standard deviation
@@ -156,12 +152,10 @@ data {
   real logWc_hat;
   real b_hat[nx]; // ADD CHECK ON THIS FOR DATA PREP
   real logA0_hat[nx];
-  real logn_hat;
+  real logn_hat; //space and time-varying n prior
   real logWb_hat[nx];
   real logDb_hat[nx];
   real logr_hat[nx];
-  real loga_hat[nx];
-  real ahg_flag; //flag for whetr to run ahg or amhg
 
   vector<lower=0>[nt] logQ_sd;
   real<lower=0> logQc_sd;
@@ -172,7 +166,6 @@ data {
   real<lower=0> logWb_sd;
   real<lower=0> logDb_sd;
   real<lower=0> logr_sd;
-  real<lower=0> loga_sd;
 }
 
 
@@ -196,6 +189,9 @@ transformed data {
   vector[ntot_man] dApos_obs;
   vector[ntot_man] sigmavec_man;
   vector[ntot_amhg] sigmavec_amhg;
+  
+  //vector[ntot_man] logn_hat_man;
+  //vector[ntot_amhg] logn_hat_amhg;
   
   int maninds_amhg[ntot_man];
   
@@ -221,6 +217,9 @@ transformed data {
   sigmavec_man = ragged_vec(sigma_man, hasdat_man);
   sigmavec_amhg = ragged_vec(sigma_amhg, hasdat_amhg);
   
+  //logn_hat_man = ragged_vec(logn_hat, hasdat_man);
+  //logn_hat_amhg = ragged_vec(logn_hat, hasdat_amhg);
+  
   // indices of vectorized hasdat_amhg that correspond to indices of 
   // vectorized hasdat_man
   maninds_amhg = commoninds(hasdat_amhg, hasdat_man);
@@ -239,11 +238,12 @@ parameters {
   vector<lower=lowerbound_logWb, upper=upperbound_logWb>[nx] logWb[inc_a];
   vector<lower=lowerbound_logDb, upper=upperbound_logDb>[nx] logDb[inc_a];
   vector<lower=lowerbound_logr, upper=upperbound_logr>[nx] logr[inc_a];
-  vector<lower=lowerbound_loga, upper=upperbound_loga>[nx] loga[inc_a];
 
   vector<lower=0>[ntot_w] Wact[meas_err];
   vector<lower=0>[ntot_man] Sact[meas_err * inc_m];
   vector[ntot_man] dApos_act[meas_err * inc_m];
+  
+  //vector<lower=lowerbound_logn,upper=upperbound_logn>[ntot_man] logn[inc_m];
 }
 
 
@@ -257,7 +257,7 @@ transformed parameters {
 
   vector[ntot_amhg] amhg_rhs[inc_a]; // RHS for AMHG likelihood
   vector[ntot_amhg] logQ_amhg[inc_a]; // location-repeated logQ
-  vector[ntot_amhg] logQc_amhg[inc_a]; //new Qc prior
+  vector[ntot_amhg] logQc_amhg[inc_a]; //new Qc term
 
   // Manning params
   if (inc_m) {
@@ -287,20 +287,7 @@ transformed parameters {
 	                                         (logn[1]) +
 	                                         (-(0.5)*logSobs_amhg[1]))));
     
-    if (ahg_flag){ //if AMHG weak, use normal AHG
-  //  amhg_rhs[1] = ragged_col(b[1], hasdat_amhg) .* logQ_amhg[1] + ragged_col(loga[1], hasdat_amhg);
-    amhg_rhs[1] = ragged_col(b[1], hasdat_amhg) .* (logQ_amhg[1]) +  
-	                                         ((-1.67) * ragged_col(logDb[1], hasdat_amhg)) + 
-	                                         ((-1.67) * ragged_col(logr[1], hasdat_amhg)) -
-	                                         ((-1.67) * (ragged_col(logr[1], hasdat_amhg)+1)) +
-	                                         ((1.67 * ragged_col(logr[1], hasdat_amhg)) .* ragged_col(logWb[1], hasdat_amhg)) +
-	                                         (logn[1]) +
-	                                         (-(0.5)*logSobs_amhg[1]);
-    }
-    else { //otherwise, use AMHG
-//  amhg_rhs[1] = ragged_col(b[1], hasdat_amhg) .* (logQ_amhg[1] - logQc[1]) + logWc[1];
     amhg_rhs[1] = ragged_col(b[1], hasdat_amhg) .* (logQ_amhg[1] - ragged_col(logQc_amhg[1], hasdat_amhg)) + logWc[1];
-    }
   }
 }
 
@@ -323,9 +310,7 @@ model {
 	  logDb[1] ~ normal(logDb_hat, logDb_sd);
 	  logr[1] ~ normal(logr_hat, logr_sd);
 	  logWb[1] ~ normal(logWb_hat, logWb_sd);
-	  loga[1] ~ normal(loga_hat, loga_sd);
   }
-  
   // Likelihood and observation error
     
   // Manning likelihood

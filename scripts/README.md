@@ -4,6 +4,6 @@ Scripts used to run analysis.
 
 Jupyter notebook runs classification framework
 
-R script runs BAM on testing data and returns performance metrics
+R scripts run BAM on testing data and returns performance metrics
 
-Stan Model is the amended model used in BAM
+new BAM model is written in Stan and titled 'Master.stan'

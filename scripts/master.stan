@@ -152,7 +152,9 @@ data {
   real logWc_hat;
   real b_hat[nx]; // ADD CHECK ON THIS FOR DATA PREP
   real logA0_hat[nx];
-  real logn_hat; //space and time-varying n prior
+  //vector[nt] logn_hat[nx]; //space and time-varying n prior
+  real logn_hat; // river-wide n prior
+  //real logn_hat[nx];
   real logWb_hat[nx];
   real logDb_hat[nx];
   real logr_hat[nx];
@@ -190,8 +192,8 @@ transformed data {
   vector[ntot_man] sigmavec_man;
   vector[ntot_amhg] sigmavec_amhg;
   
-  //vector[ntot_man] logn_hat_man;
-  //vector[ntot_amhg] logn_hat_amhg;
+ // vector[ntot_man] logn_hat_man; //for time and space-varying n
+ // vector[ntot_amhg] logn_hat_amhg; //for time and space-varying n
   
   int maninds_amhg[ntot_man];
   
@@ -217,8 +219,8 @@ transformed data {
   sigmavec_man = ragged_vec(sigma_man, hasdat_man);
   sigmavec_amhg = ragged_vec(sigma_amhg, hasdat_amhg);
   
-  //logn_hat_man = ragged_vec(logn_hat, hasdat_man);
-  //logn_hat_amhg = ragged_vec(logn_hat, hasdat_amhg);
+//  logn_hat_man = ragged_vec(logn_hat, hasdat_man); //for time and space-varying n
+//  logn_hat_amhg = ragged_vec(logn_hat, hasdat_amhg); //for time and space-varying n
   
   // indices of vectorized hasdat_amhg that correspond to indices of 
   // vectorized hasdat_man
@@ -228,7 +230,7 @@ transformed data {
 parameters {
   
   vector<lower=lowerbound_logQ,upper=upperbound_logQ>[nt] logQ;
-  real<lower=lowerbound_logn,upper=upperbound_logn> logn[inc_m];
+  real<lower=lowerbound_logn,upper=upperbound_logn> logn[inc_m]; //for river-wide n
   vector<lower=lowerbound_A0,upper=upperbound_A0>[nx] A0[inc_m];
   
   real<lower=lowerbound_logWc,upper=upperbound_logWc> logWc[inc_a];
@@ -243,7 +245,7 @@ parameters {
   vector<lower=0>[ntot_man] Sact[meas_err * inc_m];
   vector[ntot_man] dApos_act[meas_err * inc_m];
   
-  //vector<lower=lowerbound_logn,upper=upperbound_logn>[ntot_man] logn[inc_m];
+ // vector<lower=lowerbound_logn,upper=upperbound_logn>[ntot_man] logn[inc_m]; //for time and space-varying n
 }
 
 

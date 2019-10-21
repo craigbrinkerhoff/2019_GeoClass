@@ -1,5 +1,5 @@
 # 2019_GeoClass
 <br><br>
-Global River Geomorphology Classification for Assessing River Form and Constraining Remote River Discharge Estimation Algorithms
+Classifying river geomorphology to better constrain remote discharge estimation algorithms
 <br><br>
-Necessary Datasets to run the analysis are at the following link: 
+Necessary Datasets to run the analysis are at the following link:

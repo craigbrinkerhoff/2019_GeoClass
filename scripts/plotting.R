@@ -15,7 +15,7 @@ for (k in 1:length(phase_files)) {
   
   W_obs = ncvar_get(data_in, 'Reach_Timeseries/W')
 
-  temp <- median(log(W_obs))#summary(lm(regimeS~S_obs))$r.squared
+  temp <- mean(log(W_obs))
   
   output <- rbind(output, temp)
 }
@@ -67,57 +67,44 @@ colnames(new_new_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river'
 new_new_regime$Type <- rep('New_new_regime', nrow(new_new_regime))
 new_new_regime$order <- rep(5, nrow(new_new_regime))
 
-new_new_varyingN = list.files(paste(output_directory, "new_physics_new_priors_varyingN//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-new_new_varyingN <- ldply(new_new_varyingN, read_csv)
-new_new_varyingN$river <- phase_files
-colnames(new_new_varyingN) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_new_varyingN$Type <- rep('new_new_varyingN', nrow(new_new_varyingN))
-new_new_varyingN$order <- rep(5, nrow(new_new_varyingN))
-
 new_new_varyingReachN = list.files(paste(output_directory, "new_physics_new_priors_varyingReachN//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
 new_new_varyingReachN <- ldply(new_new_varyingReachN, read_csv)
 new_new_varyingReachN$river <- phase_files
 colnames(new_new_varyingReachN) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_new_varyingReachN$Type <- rep('new_new_varyingReachN', nrow(new_new_varyingReachN))
+new_new_varyingReachN$Type <- rep('new_new_regime_reachN', nrow(new_new_varyingReachN))
 new_new_varyingReachN$order <- rep(5, nrow(new_new_varyingReachN))
 
-new_new_geomorph = list.files(paste(output_directory, "new_new_rivN_geomorph_wideThresh7_5//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
+new_new_geomorph = list.files(paste(output_directory, "new_new_reachN_rivClass_globalFunc_over_6_5_all_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
 new_new_geomorph <- ldply(new_new_geomorph, read_csv)
 new_new_geomorph$river <- phase_files
 colnames(new_new_geomorph) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_new_geomorph$Type <- rep('new_new_geomorph', nrow(new_new_geomorph))
+new_new_geomorph$Type <- rep('new_new_Geomorph', nrow(new_new_geomorph))
 new_new_geomorph$order <- rep(5, nrow(new_new_geomorph))
 
-output2 <- filter(output, X5.19577569992289 < 7.5)
-smaller_wdths_geo <- filter(new_new_geomorph, Type == 'new_new_geomorph') %>% filter(river %in% output2$river) %>% group_by(Type)
-temp <- filter(new_new_regime, Type == 'new_new_regime') %>% filter(!river %in% output2$river)
-smaller_wdths_geo <- rbind.fill(smaller_wdths_geo, temp)
-
-#remove too big rivers and replace with their results from non-geomorphic classification
-bam_stats <- rbind(mark_switch, old_old_regime, old_new_regime, new_old_regime, new_new_regime, smaller_wdths_geo)
+bam_stats <- rbind(mark_switch, old_old_regime, old_new_regime, new_old_regime, new_new_regime, new_new_geomorph)
 plot <- gather(bam_stats, 'metric', 'value', c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
-plot$Type <- factor(plot$Type, levels = c('Mark_Switch', 'Old_old_regime', 'New_old_regime', 'Old_new_regime', 'New_new_regime', 'new_new_geomorph'))
+plot$Type <- factor(plot$Type, levels = c('Mark_Switch', 'Old_old_regime', 'New_old_regime', 'Old_new_regime', 'New_new_regime' ,'new_new_Geomorph'))
 plot$metric <- factor(plot$metric, levels=c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
+
+#only rivers that fit our training data
+#output2 <- filter(output, X5.20971786829646 < 6.5 | river == 'Jamuna.nc' | river == 'Tanana.nc' | river == 'Platte.nc')
+#plot <- filter(plot, river %in% output2$river)
 
 ggplot(plot, aes(x=metric, y = value, fill=Type)) +
   geom_boxplot() +
-  coord_cartesian(ylim = c(-2.3, 1))+
+  coord_cartesian(ylim = c(-2.3, 1.5))+
   ggtitle('Metrics For Regime-Switch BAM Variants Across 32 Rivers') +
-  scale_fill_brewer(palette="Accent") +
+  scale_fill_brewer(palette="Dark2") +
   geom_hline(yintercept=0, linetype='dashed') +
   geom_hline(yintercept=0.5, linetype='dashed') +
   geom_hline(yintercept=1, linetype='dashed')
 
-
-#ggplot(filter(bam_stats, Type=='New_new_regime' | Type == 'new_new_geomorph'), aes(x=river, y=(NSE), fill=Type)) + 
-#  geom_bar(position="dodge", stat='identity') +
+#ggplot(filter(bam_stats, Type=='Mark_Switch' | Type == 'new_new_geomorph'), aes(x=river, y=(NSE), fill=Type)) + 
+#  geom_bar(position=position_dodge2(), stat='identity') +
 #  scale_color_discrete() +
-#  coord_cartesian(ylim = c(-1, 1))+
+#  #coord_cartesian(ylim = c(-1, 1))+
 #  theme(axis.text.x = element_text(angle = 90)) +
 #  scale_fill_brewer(palette='Dark2')
 
 
-stats <- bam_stats %>% group_by(Type) %>% summarise(median = median(NSE))
-
-new_new_geomorph$diffNSE <- new_new_geomorph$NSE - new_new_regime$NSE
-new_new_geomorph <- merge(new_new_geomorph, output, by='river')
+stats <- group_by(plot, Type, metric) %>% dplyr::summarize(mean = mean(value), median = median(value))

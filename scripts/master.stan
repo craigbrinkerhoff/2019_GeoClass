@@ -153,8 +153,8 @@ data {
   real b_hat[nx]; // ADD CHECK ON THIS FOR DATA PREP
   real logA0_hat[nx];
   //vector[nt] logn_hat[nx]; //space and time-varying n prior
-  real logn_hat; // river-wide n prior
-  //real logn_hat[nx];
+ // real logn_hat; // river-wide n prior
+  real logn_hat[nx];
   real logWb_hat[nx];
   real logDb_hat[nx];
   real logr_hat[nx];
@@ -230,7 +230,7 @@ transformed data {
 parameters {
   
   vector<lower=lowerbound_logQ,upper=upperbound_logQ>[nt] logQ;
-  real<lower=lowerbound_logn,upper=upperbound_logn> logn[inc_m]; //for river-wide n
+  vector<lower=lowerbound_logn,upper=upperbound_logn>[nx] logn[inc_m]; //for river-wide n
   vector<lower=lowerbound_A0,upper=upperbound_A0>[nx] A0[inc_m];
   
   real<lower=lowerbound_logWc,upper=upperbound_logWc> logWc[inc_a];
@@ -274,7 +274,7 @@ transformed parameters {
     }
     
     logQ_man[1] = ragged_row(logQ, hasdat_man);
-    man_rhs[1] = 10. * logA_man[1] - 6. * logn[1] - 6. * logQ_man[1];
+    man_rhs[1] = 10. * logA_man[1] - 6. * ragged_col(logn[1], hasdat_man) - 6. * logQ_man[1];
   }
   
   if (inc_a) {
@@ -286,7 +286,7 @@ transformed parameters {
 	                                         ((-1.67) * ragged_col(logr[1], hasdat_amhg)) -
 	                                         ((-1.67) * (ragged_col(logr[1], hasdat_amhg)+1)) +
 	                                         ((1.67 * ragged_col(logr[1], hasdat_amhg)) .* ragged_col(logWb[1], hasdat_amhg)) +
-	                                         (logn[1]) +
+	                                         (ragged_col(logn[1], hasdat_amhg)) +
 	                                         (-(0.5)*logSobs_amhg[1]))));
     
     amhg_rhs[1] = ragged_col(b[1], hasdat_amhg) .* (logQ_amhg[1] - ragged_col(logQc_amhg[1], hasdat_amhg)) + logWc[1];

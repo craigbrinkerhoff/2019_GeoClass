@@ -15,8 +15,7 @@ for (k in 1:length(phase_files)) {
   
   W_obs = ncvar_get(data_in, 'Reach_Timeseries/W')
 
-  temp <- mean(log(W_obs))
-  
+  temp <- sd(log(W_obs))
   output <- rbind(output, temp)
 }
 output$river <- phase_files
@@ -67,12 +66,12 @@ colnames(new_new_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river'
 new_new_regime$Type <- rep('New_new_regime', nrow(new_new_regime))
 new_new_regime$order <- rep(5, nrow(new_new_regime))
 
-new_new_varyingReachN = list.files(paste(output_directory, "new_physics_new_priors_varyingReachN//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-new_new_varyingReachN <- ldply(new_new_varyingReachN, read_csv)
-new_new_varyingReachN$river <- phase_files
-colnames(new_new_varyingReachN) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_new_varyingReachN$Type <- rep('new_new_regime_reachN', nrow(new_new_varyingReachN))
-new_new_varyingReachN$order <- rep(5, nrow(new_new_varyingReachN))
+new_new_KMeans = list.files(paste(output_directory, "new_new_reachN_KMeansClass_globalFunc_over_6_5_all_priors_wide_var//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
+new_new_KMeans <- ldply(new_new_KMeans, read_csv)
+new_new_KMeans$river <- phase_files
+colnames(new_new_KMeans) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
+new_new_KMeans$Type <- rep('new_new_KMeans', nrow(new_new_KMeans))
+new_new_KMeans$order <- rep(5, nrow(new_new_KMeans))
 
 new_new_geomorph = list.files(paste(output_directory, "new_new_reachN_rivClass_globalFunc_over_6_5_all_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
 new_new_geomorph <- ldply(new_new_geomorph, read_csv)
@@ -81,30 +80,26 @@ colnames(new_new_geomorph) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'rive
 new_new_geomorph$Type <- rep('new_new_Geomorph', nrow(new_new_geomorph))
 new_new_geomorph$order <- rep(5, nrow(new_new_geomorph))
 
-bam_stats <- rbind(mark_switch, old_old_regime, old_new_regime, new_old_regime, new_new_regime, new_new_geomorph)
+bam_stats <- rbind(mark_switch, old_old_regime, old_new_regime, new_old_regime, new_new_regime, new_new_KMeans, new_new_geomorph)
 plot <- gather(bam_stats, 'metric', 'value', c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
-plot$Type <- factor(plot$Type, levels = c('Mark_Switch', 'Old_old_regime', 'New_old_regime', 'Old_new_regime', 'New_new_regime' ,'new_new_Geomorph'))
+plot$Type <- factor(plot$Type, levels = c('Mark_Switch', 'Old_old_regime', 'New_old_regime', 'Old_new_regime', 'New_new_regime', 'new_new_KMeans', 'new_new_Geomorph'))
 plot$metric <- factor(plot$metric, levels=c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
 
-#only rivers that fit our training data
-#output2 <- filter(output, X5.20971786829646 < 6.5 | river == 'Jamuna.nc' | river == 'Tanana.nc' | river == 'Platte.nc')
-#plot <- filter(plot, river %in% output2$river)
+`%notin%` <- Negate(`%in%`)
+#rivs <- c('MissouriUpstream.nc', 'MissouriMidsection.nc', 'MissouriDownstream.nc')  #poorly fit rivers for Kmeans
+#plot <- filter(plot, river %notin% rivs)
 
-ggplot(plot, aes(x=metric, y = value, fill=Type)) +
-  geom_boxplot() +
+boxplots <- ggplot(plot, aes(x=metric, y = value)) +
+  geom_violin(aes(fill=Type), scale = 'width', trim = TRUE) + 
+  geom_boxplot(aes(group=interaction(Type,metric)), fill='azure', width = 0.20, outlier.colour=NA, position = position_dodge(width = 0.9), lwd=0.75, fatten = 3) +
   coord_cartesian(ylim = c(-2.3, 1.5))+
-  ggtitle('Metrics For Regime-Switch BAM Variants Across 32 Rivers') +
+  ggtitle('Performance Metrics For BAM Variants Across 32 Rivers') +
   scale_fill_brewer(palette="Dark2") +
   geom_hline(yintercept=0, linetype='dashed') +
   geom_hline(yintercept=0.5, linetype='dashed') +
   geom_hline(yintercept=1, linetype='dashed')
-
-#ggplot(filter(bam_stats, Type=='Mark_Switch' | Type == 'new_new_geomorph'), aes(x=river, y=(NSE), fill=Type)) + 
-#  geom_bar(position=position_dodge2(), stat='identity') +
-#  scale_color_discrete() +
-#  #coord_cartesian(ylim = c(-1, 1))+
-#  theme(axis.text.x = element_text(angle = 90)) +
-#  scale_fill_brewer(palette='Dark2')
-
-
 stats <- group_by(plot, Type, metric) %>% dplyr::summarize(mean = mean(value), median = median(value))
+
+boxplots
+
+new_new_KMeans$diff <- new_new_KMeans$NSE - new_new_geomorph$NSE

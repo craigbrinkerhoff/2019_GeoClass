@@ -46,8 +46,7 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   }
   #-----------------
   output_string= paste(directory,'BAM_Craig_',substr(file,1,(nchar(file)-2)),'csv',sep="")
-  #output_string2= paste(directory,'BAM_cbrinkerhoff_switch_',substr(file,1,(nchar(file)-2)),'csv',sep="")
-  
+
   data_in =nc_open(file)
   
   W_obs=ncvar_get(data_in,'Reach_Timeseries/W')
@@ -133,15 +132,15 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   Qbhat_func <- function(x) {-1.8699 + 1.8871*mean(log10(x))} #r2 0.89
   
   #hat variables
-  a0hat <- apply(W_obs, 1, a0Hat_func)
-  Wbhat <- apply(W_obs, 1, Wbhat_func)
+ # a0hat <- apply(W_obs, 1, a0Hat_func)
+#  Wbhat <- apply(W_obs, 1, Wbhat_func)
   Dbhat <- apply(W_obs, 1, Dbhat_func)
   Qbhat <- apply(W_obs, 1, Qbhat_func)
  # nhat <- apply(S_obs, 1, nhat_func_new) #nhat_func(S_obs)
   #bhat <- apply(W_obs, 1, bhat_func)
   #rhat <- apply(W_obs, 1, rhat_func)
   
-  #AHG/AMHG Flag (in log base 10 NOT natural log like everyting else)
+  #AHG/AMHG Flag (in log base 10 NOT natural log like everything else)
   H_obs = rowMeans(ncvar_get(data_in, 'XS_Timeseries/H'))
   xs_bnds = ncvar_get(data_in, 'XS_Timeseries/X')
   S_obs_model <- c(0,1)
@@ -158,20 +157,25 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   
   #Classify river
   classify_func <- function(x) {
-    width <- mean(log(x))
-    maxWidth = 6.5 #from training data, approximately 1.5*IQR + median for class 8, so that abything considered an extreme value for class 8 is 'big river'
+    temp <- filter(output, river == file)
+    width <- temp$X5.20971786829646 #mean(log(x))
+    maxWidth = 6.5
     classes <- widthsClass[,7] #median width of each river type
     output <- ifelse(width > maxWidth, 100, which.min(abs(classes-width)))
     
     return(output)
   }
-  rivClass <- classify_func(W_obs) # apply(W_obs, 1, classify_func)
+  
+  rivClass <- classify_func(W_obs) - 1 #minus 1 added for dbscan as I remove cluster -1 and mess up indxes
   print(rivClass)
   
   #create variables
   rhat <- 0
   bhat <- 0
   nhat <- 0
+  a0hat <- 0
+  Wbhat <- 0
+  Dbhat <- 0
   r_sd <- 0
   B_sd <- 0
   n_sd <- 0
@@ -189,21 +193,20 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   Wb_upper <- 0
   Wb_lower <- 0
   
-  for (k in 1:nrow(W_obs)) {
     if (rivClass == 100){
-      #width = mean(log(W_obs[k,]))
-    
-      r_temp =  rhat_func(W_obs[k,]) #extrapolateClassModels[1,2]+extrapolateClassModels[1,3]*width
-      n_temp =  nhat_func_new(S_obs[k,]) #extrapolateClassModels[2,2]+extrapolateClassModels[2,3]*width
-      b_temp = bhat_func(W_obs[k,])
+      rhat <- apply(W_obs, 1, rhat_func)
+      bhat <- apply(W_obs, 1, bhat_func)
+      nhat <- apply(S_obs, 1, nhat_func_new)
+      Dbhat <- apply(W_obs, 1, Dbhat_func)
+      Wbhat <- apply(W_obs, 1, Wbhat_func)
+      a0hat <- apply(W_obs, 1, a0Hat_func)
       
-      rhat[k] = r_temp
-      bhat[k] = b_temp
-      nhat[k] = n_temp
-      
-      r_sd = SDs[3,2] #extrapolateClassModels[7,2]+extrapolateClassModels[7,3]*width
-      n_sd = SDs[4,2] #extrapolateClassModels[8,2]+extrapolateClassModels[8,3]*width
+      r_sd = SDs[3,2]
+      n_sd = SDs[4,2]
       B_sd = SDs[6,2]
+      a0_sd <- SDs[5,2]
+      Wb_sd <- SDs[1,2]
+      Db_sd <- SDs[2,2]
     
       r_lower = r_global[3,2]
       b_lower = b_global[3,2]
@@ -211,86 +214,86 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
       r_upper = r_global[7,2]
       b_upper = b_global[7,2]
       
-      a0_upper <- A0[7,2]
-      a0_lower <- A0[3,2]
-      a0_sd <- SDs[5,2]
+      a0_upper <- A0[7,2]#1000000 #set big for supervised
+      a0_lower <- A0[3,2]#A0[4,2] #set to 25 percentile of global prior for supervised
       
-      Wb_upper <- Wb[7,2]
-      Wb_lower <- Wb[3,2]
-      Wb_sd <- SDs[1,2]
+      Wb_upper <- Wb[7,2]# 10 #set big for supervised
+      Wb_lower <- Wb[3,2]#Wb[4,2] #set to 25 percentile of global prior for supervised
       
-      Db_upper <- Db[7,2]
-      Db_lower <- Db[3,2]
-      Db_sd <- SDs[2,2]
+      Db_upper <- Db[7,2]#5 #set big for supervised
+      Db_lower <- Db[3,2]#Db[4,2] #set to 25 percentile of global prior for supervised
     }
   
-    if (rivClass != 100){
-      rhat[k] = r[rivClass, 7]
-      nhat[k] = N[rivClass, 7]
-      bhat[k] = B[rivClass, 7]
-      a0hat[k] = A0class[rivClass, 7]
-      Wbhat[k] = Wbclass[rivClass, 7]
-      Dbhat[k] = Dbclass[rivClass, 7]
+   else if (rivClass != 100){
+     for (k in 1:nrow(W_obs)) {
+        rhat[k] = r[rivClass, 7]
+        nhat[k] = N[rivClass, 7]
+        bhat[k] = B[rivClass, 7]
+        a0hat[k] = A0class[rivClass, 7]
+        Wbhat[k] = Wbclass[rivClass, 7]
+        Dbhat[k] = Dbclass[rivClass, 7]
       
-      r_upper <- r[rivClass,9]
-      r_lower <- r[rivClass,5]
-      r_sd <- r[rivClass,4]
+        r_upper <- r[rivClass,9]
+        r_lower <- r[rivClass,5]
+        r_sd <- r[rivClass,4]
     
-      n_sd <- N[rivClass,4]
+        n_sd <- N[rivClass,4]
     
-      b_upper <- B[rivClass,9]
-      b_lower <- B[rivClass,5]
-      B_sd <- B[rivClass,4]
+        b_upper <- B[rivClass,9]
+        b_lower <- B[rivClass,5]
+        B_sd <- B[rivClass,4]
       
-      a0_upper <- A0class[rivClass,9]
-      a0_lower <- A0class[rivClass,5]
-      a0_sd <- A0class[rivClass,4]
+        a0_upper <- A0class[rivClass,9]
+        a0_lower <- A0class[rivClass,5]
+        a0_sd <- A0class[rivClass,4]
       
-      Wb_upper <- Wbclass[rivClass,9]
-      Wb_lower <- Wbclass[rivClass,5]
-      Wb_sd <- Wbclass[rivClass,4]
+        Wb_upper <- Wbclass[rivClass,9]
+        Wb_lower <- Wbclass[rivClass,5]
+        Wb_sd <- Wbclass[rivClass,4]
       
-      Db_upper <- Dbclass[rivClass,9]
-      Db_lower <- Dbclass[rivClass,5]
-      Db_sd <- Dbclass[rivClass,4]
+        Db_upper <- Dbclass[rivClass,9]
+        Db_lower <- Dbclass[rivClass,5]
+        Db_sd <- Dbclass[rivClass,4]
+     }
     }
   
-    #braided river flag, using values from distribution of all x-sections where r < 1
-    braidedFlag <- ifelse(sd(log(W_obs)) >= 0.45, 1, 0)
-    if (braidedFlag == 1){
-      print('braided')
+    #'braided' ,or high-width variability, river flag, using values from distribution of all x-sections where r < 1
+   # braidedFlag <- ifelse(sd(log(W_obs)) >= 0.45, 1, 0)
+  #  if (braidedFlag == 1){
+  #    for (k in 1:nrow(W_obs)) {
+  #      print('high width variability')
     
-      #from training sites r < 1
-      rhat[k] <- -0.249
-      bhat[k] <- 0.405
-      nhat[k] <- -3.41
-      Wbhat[k] <- 3.039
-      Dbhat[k] <- -1.00
-      a0hat[k] <- 4.394
+        #hardcoded priors for training data where r < 1
+  #      rhat[k] <- -0.249
+  #      bhat[k] <- 0.405
+  #      nhat[k] <- -3.41
+  #      Wbhat[k] <- 3.039
+  #      Dbhat[k] <- -1.00
+  #      a0hat[k] <- 4.394
     
-      b_upper <- 0.77 
-      b_lower <- 0.029
-      B_sd <- 0.11
+  #      b_upper <- 0.77 
+  #      b_lower <- 0.029
+  #      B_sd <- 0.11
     
-      r_upper <- 0
-      r_lower <- -2.58
-      r_sd <- 0.412
+  #      r_upper <- 0
+  #      r_lower <- -2.58
+  #      r_sd <- 0.412
     
-      n_sd <- 1.23
+  #      n_sd <- 1.23
       
-      Wb_upper <- 6.917
-      Wb_lower <- -0.1227
-      Wb_sd <- 1.284
+  #      Wb_upper <- 6.917
+  #      Wb_lower <- -0.1227
+  #      Wb_sd <- 1.284
       
-      Db_upper <- 2.572
-      Db_lower <- -3.02
-      Db_sd <- 1.147
+  #      Db_upper <- 2.572
+  #      Db_lower <- -3.02
+  #      Db_sd <- 1.147
       
-      a0_upper <- 11.55
-      a0_lower <- 0.262
-      a0_sd <- 2.285
-    }
-  }
+  #      a0_upper <- 11.55
+  #      a0_lower <- 0.262
+  #      a0_sd <- 2.285
+  #    }
+  #  }
   
   priors <- bam_priors(bamdata = bamdata, logQ_sd = cv2sigma(1), 
                        logr_hat = rhat, logWb_hat = Wbhat, logDb_hat = Dbhat, b_hat = bhat,logn_hat = nhat, logA0_hat = a0hat, 
@@ -401,7 +404,7 @@ mintime=3
 
 for (phase in allpepsi2){
   setwd(phase)
-  output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//new_new_reachN_rivClass_globalFunc_over_6_5_all_priors_10_classes//')
+  output_directory=paste('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//outputs//new_new_reachN_DBSCAN_1_Class_globalFunc_over_6_5_all_priors//')
   phase_files= list.files(pattern = "\\.nc$")
   # phase_files=phase_files[1]
   #output_string= paste(training1,'metricscv2.csv',sep="")
@@ -418,19 +421,29 @@ for (phase in allpepsi2){
 }
 
 #prior distributions
-B <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsBClass.csv')
-b_global <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsB.csv')
-N <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsNClass.csv')
-A0 <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsA0.csv')
-Db <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsDb.csv')
-Wb <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsWb.csv')
-A0class <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsA0Class.csv')
-Dbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsDbClass.csv')
-Wbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsWbClass.csv')
-r <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsRClass.csv')
-r_global <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorsR.csv')
-SDs <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priorSDs.csv')
-widthsClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//WidthsClass.csv')
+B <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsBClassDBSCAN_1.csv')
+b_global <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsB.csv')
+N <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsNClassDBSCAN_1.csv')
+A0 <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsA0.csv')
+Db <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsDb.csv')
+Wb <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsWb.csv')
+A0class <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsA0ClassDBSCAN_1.csv')
+Dbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsDbClassDBSCAN_1.csv')
+Wbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsWbClassDBSCAN_1.csv')
+r <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsRClassDBSCAN_1.csv')
+r_global <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsR.csv')
+SDs <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorSDs.csv')
+widthsClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//WidthsClassDBSCAN_1.csv')
+
+#remove noise class
+B <- B[-1,]
+N <- N[-1,]
+A0class <- A0class[-1,]
+Wbclass <- Wbclass[-1,]
+Dbclass <- Dbclass[-1,]
+r <- r[-1,]
+#logisticInts <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//logisticInts.csv', header=FALSE)
+#logisticCoefs <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//logisticCoefs.csv', header=FALSE)
 
 #Compile and run my BAM stan model
 cbrinkerhoff_model <- stan_model("C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//master.stan", model_name = 'cbrinkerhoff_model')
@@ -470,14 +483,15 @@ for (k in 1:length(phase_files)) {
   data_in =nc_open(file)
   
   W_obs = ncvar_get(data_in, 'Reach_Timeseries/W')
-  
-  temp <- sd(log(W_obs))#summary(lm(regimeS~S_obs))$r.squared
+
+  temp <- mean(log(W_obs))
   
   output <- rbind(output, temp)
 }
 output$river <- phase_files
 
 for (i in 2:(length(phase_files))) {
+  if (i == 23){next}
   print(phase_files[i])
   statis <- batchbam(phase_files[i], output_directory, errorflag, minxs, mintime)
   print(paste('river ', phase_files[i],  ' done', sep=''))

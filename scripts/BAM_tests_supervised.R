@@ -156,17 +156,17 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   else {amhgFlag = 0}
   
   #Classify river for supervised framework
-  #classify_func <- function(x) {
-  #  temp <- filter(output, river == file)
-  #  width <- temp$X5.20971786829646 #mean(log(x))
-  #  maxWidth = 6.5
-  #  classes <- widthsClass[,7] #median width of each river type
-  #  output <- ifelse(width > maxWidth, 101, which.min(abs(classes-width)))
+  classify_func <- function(x) {
+    temp <- filter(output, river == file)
+    width <- temp$X5.20971786829646 #mean(log(x))
+    maxWidth = 6.5
+    classes <- widthsClass[,7] #median width of each river type
+    output <- ifelse(width > maxWidth, 101, which.min(abs(classes-width)))
     
-  #  return(output)
-  #}
+    return(output)
+  }
   
-  rivClass <- ifelse(rivClass == 0, 101, rivClass) #101 for 'noise' rivers
+  rivClass <- classify_func(W_obs)
   print(rivClass)
   
   #create variables
@@ -193,7 +193,7 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
   Wb_upper <- 0
   Wb_lower <- 0
   
-    if (rivClass == 101){ #'noise' rivers
+    if (rivClass == 101){ #'big' rivers
       rhat <- apply(W_obs, 1, rhat_func)
       bhat <- apply(W_obs, 1, bhat_func)
       nhat <- apply(S_obs, 1, nhat_func_new)
@@ -214,18 +214,18 @@ batchbam = function(file,directory,errorflag, minxs, mintime){
       r_upper = r_global[7,2]
       b_upper = b_global[7,2]
       
-      a0_upper <- A0[7,2] #1000000 #set big for supervised
-      a0_lower <- A0[3,2] #A0[4,2] #set to 25 percentile of global prior for supervised
+      a0_upper <- 1000000 #set big for supervised
+      a0_lower <- A0[4,2] #set to 25 percentile of global prior for supervised
       
-      Wb_upper <- Wb[7,2] #10 #set big for supervised
-      Wb_lower <- Wb[3,2] #Wb[4,2] #set to 25 percentile of global prior for supervised
+      Wb_upper <- 10 #set big for supervised
+      Wb_lower <- Wb[4,2] #set to 25 percentile of global prior for supervised
       
-      Db_upper <- Db[7,2] #5 #set big for supervised
-      Db_lower <- Db[3,2] #Db[4,2] #set to 25 percentile of global prior for supervised
+      Db_upper <- 5 #set big for supervised
+      Db_lower <- Db[4,2] #set to 25 percentile of global prior for supervised
     }
   
   #DBSCAN CURRENT IMPLEMENTATION
-   else if (rivClass != 100){ #'classified' rivers
+   else if (rivClass != 101){ #'classified' rivers
      for (k in 1:nrow(W_obs)) {
         rhat[k] = r[rivClass, 7]
         nhat[k] = N[rivClass, 7]
@@ -432,28 +432,19 @@ for (phase in allpepsi2){
 }
 
 #prior distributions
-B <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsBClassDBSCAN_20.csv')
+B <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsBClass.csv')
 b_global <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsB.csv')
-N <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsNClassDBSCAN_20.csv')
+N <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsNClass.csv')
 A0 <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsA0.csv')
 Db <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsDb.csv')
 Wb <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsWb.csv')
-A0class <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsA0ClassDBSCAN_20.csv')
-Dbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsDbClassDBSCAN_20.csv')
-Wbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsWbClassDBSCAN_20.csv')
-r <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsRClassDBSCAN_20.csv')
+A0class <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsA0Class.csv')
+Dbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsDbClass.csv')
+Wbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsWbClass.csv')
+r <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsRClass.csv')
 r_global <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsR.csv')
 SDs <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorSDs.csv')
-#widthsClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//WidthsClassDBSCAN_1.csv')
-rivClasses <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//pepsiClassified_ep_20.csv') #random forest outputs
-
-#remove noise class
-B <- B[-1,]
-N <- N[-1,]
-A0class <- A0class[-1,]
-Wbclass <- Wbclass[-1,]
-Dbclass <- Dbclass[-1,]
-r <- r[-1,]
+widthsClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//WidthsClass.csv')
 
 #Compile and run my BAM stan model
 cbrinkerhoff_model <- stan_model("C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//master.stan", model_name = 'cbrinkerhoff_model')
@@ -502,7 +493,7 @@ output$river <- phase_files
 
 for (i in 1:(length(phase_files))) {
   print(phase_files[i])
-  rivClass <- rivClasses$cluster[i] + 1 #fix indices for dbscan clusters
+  rivClass <- rivClasses$cluster[i]
   statis <- batchbam(phase_files[i], output_directory, errorflag, minxs, mintime)
   print(paste('river ', phase_files[i],  ' done', sep=''))
 }

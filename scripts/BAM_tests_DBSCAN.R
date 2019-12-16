@@ -444,8 +444,8 @@ Wbclass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomor
 r <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsRClassDBSCAN_20.csv')
 r_global <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorsR.csv')
 SDs <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//priorSDs.csv')
-#widthsClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//WidthsClassDBSCAN_1.csv')
-rivClasses <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//pepsiClassified_ep_20.csv') #random forest outputs
+widthsClass <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//priors//WidthsClass.csv')
+#rivClasses <- read.csv('C://Users//cbrinkerhoff//Box Sync//Ongoing Projects//geomorph_class//pepsiClassified_ep_20.csv') #random forest outputs
 
 #remove noise class
 B <- B[-1,]
@@ -502,7 +502,7 @@ output$river <- phase_files
 
 for (i in 1:(length(phase_files))) {
   print(phase_files[i])
-  rivClass <- rivClasses$cluster[i] + 1 #fix indices for dbscan clusters
+  rivClass <- rivClasses$cluster[i]
   statis <- batchbam(phase_files[i], output_directory, errorflag, minxs, mintime)
   print(paste('river ', phase_files[i],  ' done', sep=''))
 }

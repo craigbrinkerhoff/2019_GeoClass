@@ -1,56 +1,60 @@
 #Creator: Craig Brinkerhoff
-#Description: Create figures for geoBAM paper
+#Contact: cbrinkerhoff[at]umass[edu]
+#Spring 2020
+#Description: Create Figures for 'Constraining Remote River Discharge Estimation Using Reach-Scale Geomorphology'.
+#Citation: Brinkerhoff, C. B., Gleason, C.J., Feng, D., Lin, P. (accepted at Water Resources Research).  Constraining Remote River Discharge Estimation Using Reach-Scale Geomorphology.
 
-library(readr)
-library(reshape2)
-library(plyr)
-library(tidyr)
-library(cowplot)
-library(RColorBrewer)
-library(forcats)
-library(dplyr)
-library(ggplot2)
-library(gridExtra)
-library(grid)
-library(truncnorm)
-library(tmap)
-library(sf)
-library(raster)
-library(ncdf4)
-library(ncdf4.helpers)
-library(hydroGOF)
-library(scales)
+
+#NOTES-----------------------------------------
+#1) there are a TON of manual filepaths in this code. You will need to update all of these (and acquire the data they're referring to, aside
+  #from this study's results) in order to run this code.
+#2) There is a bunch of repeated code in here as a function of resetting working directorys. It is advised to click through manually rather than run all code at once.
+
+#Load necessary packages and automatically install if necessary---------------------------------------------------
+packages = c("tidyverse", "readr", "reshape2", "plyr", "cowplot", "RColorBrewer", "forcats", "gridExtra", "grid", "truncnorm", "tmap", "sf", 'raster', 'ncdf4', 'ncdf4.helpers', 'hydroGOF', 'scales')
+package.check <- lapply(packages, FUN = function(x) {
+  if (!require(x, character.only = TRUE)) {
+    install.packages(x, dependencies = TRUE)
+    library(x, character.only = TRUE)
+  }
+})
+
+#Set ggplot theme using cowplot
 theme_set(theme_cowplot())
 
-training2='C:\\Users\\craig\\Box Sync\\Datasets\\Pepsi1\\'
+#Set up environment---------------------------------------------------
+training2='File path for SWOT-simulated rivers'
 setwd(training2)
 phase_files= list.files(pattern = "\\.nc$")
 
-output_directory=paste('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\')
+output_directory=paste('File path for study results')
 
+#Functions for padding decimal places
 scaleFUN <- function(x) sprintf("%.2f", x)
 scaleFUN3 <- function(x) sprintf("%.1f", x)
 
+#SWOT river names
 files <- c('Connecticut.csv', 'Cumberland.csv', 'Ganges.csv', 'GaronneDownstream.csv', 'GaronneUpstream.csv',
            'Kanawha.csv', 'MississippiDownstream.csv', 'MississippiUpstream.csv',
            'Ohio.csv', 'Platte.csv', 'Po.csv', 'SacramentoDownstream.csv', 'SacramentoUpstream.csv',
            'Seine.csv', 'Severn.csv', 'StLawrenceDownstream.csv', 'StLawrenceUpstream.csv', 'Tanana.csv',
            'Wabash.csv')
 
-#SWOT Hydrographs figure-----------------------------------------------------------------------------------
+#Figure 6-----------------------------------------------------------------------------------
 pltList <- list()
 
+#Gather results for 19 rivers
 for (i in 1:19){
   plot <- data.frame()
   file = files[i]
   river <- substr(file,1,nchar(file)-4)
-  predQ <- read.csv(paste(output_directory, 'swot_independent_test\\BAM_control\\hydrographs\\predQ_Craig_', file, sep=''), header=TRUE, sep=",")
+  predQ <- read.csv(paste(output_directory, '~swot\\\\BAM_control\\hydrographs\\predQ_Craig_', file, sep=''), header=TRUE, sep=",")
   predQ <- predQ$mean
   
-  predQsupervised <- read.csv(paste(output_directory, 'swot_independent_test\\geoBAM_expert\\hydrographs\\predQ_Craig_', file, sep=''), header=TRUE, sep=",")
+  predQsupervised <- read.csv(paste(output_directory, '~swot\\geoBAM_expert\\hydrographs\\predQ_Craig_', file, sep=''), header=TRUE, sep=",")
   predQsupervised <- predQsupervised$mean
   
-  obsQ <- read.csv(paste(output_directory, 'swot_independent_test\\BAM_control\\hydrographs\\observed\\obsQ_', file, sep=''), header=TRUE, sep=",")
+  obsQ <- read.csv(paste(output_directory, '~swot\\BAM_control\\hydrographs\\observed\\obsQ_', file, sep=''), header=TRUE, sep=",")
   
   #normalize by max time
   maxTime <- max(obsQ$X)
@@ -73,6 +77,7 @@ for (i in 1:19){
     ggtitle(river)
   }
 
+#build subplots
 plotgrid <- plot_grid(pltList$hydrograph_Connecticut.csv + theme(legend.position='none', axis.text.x = element_blank(), axis.ticks.x = element_blank()),
                       pltList$hydrograph_Cumberland.csv + theme(legend.position='none', axis.text.x = element_blank(), axis.ticks.x = element_blank()),
                       pltList$hydrograph_Ganges.csv + theme(legend.position='none', axis.text.x = element_blank(), axis.ticks.x = element_blank()),
@@ -93,61 +98,70 @@ plotgrid <- plot_grid(pltList$hydrograph_Connecticut.csv + theme(legend.position
                       pltList$hydrograph_Tanana.csv + theme(legend.position='none'),
                       pltList$hydrograph_Wabash.csv + theme(legend.position='none'),
                       ncol=3)
-
+#build figure legend
 legend <- get_legend(
   # create some space to the left of the legend
   pltList$hydrograph_GaronneUpstream.csv + theme(legend.text=element_text(size=18))
 )
 
+#Build figure
 plotHydrographs <- plotgrid + draw_grob(legend, 0.7, -0.42, 0.25, 1)
 
 yTitleCombo <- textGrob(expression(Discharge~(cms)), gp=gpar(fontface="bold", col="black", fontsize=19), rot=90)
 xTitleCombo <- textGrob(expression(Timestep/Max~Timestep), gp=gpar(fontface="bold", col="black", fontsize=19))
 
 plotHydrographs <- grid.arrange(arrangeGrob(plotHydrographs, left = yTitleCombo, bottom = xTitleCombo))
-ggsave('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\hydrographs_swot.png', plotHydrographs, width = 10, height = 11)
+ggsave('Figure_6.png', plotHydrographs, width = 10, height = 11)
 
 
 
 
-#Mackenzie 4-panel plot for NSE--------------------------------------------------------------------------------------------
-mackenzie_geoBAM_expert <- read.csv("C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\mackenzie\\geoBAMr_expert_vic_hrr.csv", header = TRUE)
+#Figure 3--------------------------------------------------------------------------------------------
+#Gather and calculate Mackenzie results. This can be slow.....
+mackenzie_geoBAM_expert <- read.csv("~Mackenzie\\geoBAMr_expert_Q.csv", header = TRUE)
 mackenzie_geoBAM_expert$Date <- as.Date(mackenzie_geoBAM_expert$Date, '%m/%d/%Y')
 
-mackenzie_BAM <- read.csv("C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\mackenzie\\bam_vic_hrr.csv", header = TRUE)
+mackenzie_BAM <- read.csv("~Mackenzie\\bam_Q.csv", header = TRUE)
 mackenzie_BAM <- mackenzie_BAM[,-1]
 mackenzie_BAM$Date <- as.Date(mackenzie_BAM$Date, '%m/%d/%Y')
 
-mackenzie_geoBAM_unsupervised <- read.csv("C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\mackenzie\\geoBAMr_unsupervised_vic_hrr.csv", header = TRUE)
+mackenzie_geoBAM_unsupervised <- read.csv("~Mackenzie\\geoBAMr_unsupervised_Q.csv", header = TRUE)
 mackenzie_geoBAM_unsupervised$Date <- as.Date(mackenzie_geoBAM_unsupervised$Date, '%m/%d/%Y')
 
-mackenzie_obs <- read.table("C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\mackenzie\\gauge_cal.txt", header = TRUE, check.names = FALSE)
+#Read in Gauge data
+mackenzie_obs <- read.table("~Mackenzie\\gauge_cal.txt", header = TRUE, check.names = FALSE)
 mackenzie_obs$Date <- seq(as.Date("1984/1/1"), as.Date("2013/12/31"), "days")
 mackenzie_obs <- gather(mackenzie_obs, key=key, value=value, c(-Date))
 colnames(mackenzie_obs) <- c('Date', 'reach', 'discharge')
 mackenzie_obs <- filter(mackenzie_obs, discharge >= 0) #filter out when gauges aren't running
 
-mackenzie <- merge(mackenzie_obs, mackenzie_geoBAM_expert, by=c("Date","reach")) # NA's match  #full_join(mackenzie_obs, mackenzie_geoBAM_expert, by=c('Date', 'reach'))
+#Join all results with gauge observations
+mackenzie <- merge(mackenzie_obs, mackenzie_geoBAM_expert, by=c("Date","reach"))
 mackenzie <- merge(mackenzie, mackenzie_geoBAM_unsupervised, by=c("Date","reach"))
 mackenzie <- merge(mackenzie, mackenzie_BAM, by=c("Date","reach"))
 
 colnames(mackenzie) <- c('Date', 'reach', 'obs_Q', 'geoBAM_expert_mean', 'geoBAM_expert_sd','geoBAM_unsupervised_mean', 'geoBAM_unsupervised_sd', 'BAM_mean', 'BAM_sd') #'geoBAM_old_mean', 'geoBAM_old_sd',
 
+#Calcualte performance metrics
 stats <- group_by(mackenzie, reach) %>% 
   summarise(NSE_expert = NSE(geoBAM_expert_mean, obs_Q, na.rm=TRUE), 
             NSE_unsupervised = NSE(geoBAM_unsupervised_mean, obs_Q, na.rm=TRUE), 
             NSE_BAM = NSE(BAM_mean, obs_Q, na.rm=TRUE),
             n = n())
 
+#Wrangle into plotable form
 plot <- gather(stats, key = key, value=value, c('NSE_expert', 'NSE_unsupervised', 'NSE_BAM')) #, 'NSE_oldgeoBAM'
 
+#Calcualte increase in NSE
 mackenzie_improvement <- data.frame('increaseNSE' = (stats$NSE_unsupervised - stats$NSE_BAM))
 mackenzie_improvement$improve <- ifelse(mackenzie_improvement$increaseNSE > 0.1, 1, 0) #for paper results
 
+#Identify outlying rivers (i.e. those not plotted in figure)
 not_plottedNSE <- plot %>% group_by(key) %>%
   filter(value < -2.3) %>%
   summarise(num_outliers = n())
 
+#Create Figure subplots
 mackenzie_boxplots <- ggplot(plot, aes(x=key, y=value)) + 
   geom_boxplot(aes(fill=key), size=0.8) + 
   coord_cartesian(ylim=c(-2.3,1))+
@@ -199,23 +213,25 @@ legend <- get_legend(mackenzie_boxplots +
                              legend.text = element_text(size = 25)) +
                        guides(shape = guide_legend(override.aes = list(size = 25))))
 
+#Create Figure and save
 plotMackenzie <- plot_grid(gridMackenzie)
 plotMackenzie <- plotMackenzie + draw_grob(legend, 0.675, -0.225, 0.25, 1)
 plotMackenzie
-save_plot("C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\\\mackenzie.png", plotMackenzie, ncol=2, base_height = 8.5, base_width = 5.5)
+save_plot("Figure_3.png", plotMackenzie, ncol=2, base_height = 8.5, base_width = 5.5)
 
 
-#4-panel plot for SWOT--------------------------------------------------------------------------
-output_directory=paste('C://Users//craig//Box Sync//Ongoing Projects//geomorph_class//outputs//final_results//')
+#Figure 5--------------------------------------------------------------------------
+output_directory=paste('file path to results')
 
-BAM_control = list.files(paste(output_directory, "swot_independent_test\\BAM_control\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
+#Wrangel data into plotable format
+BAM_control = list.files(paste(output_directory, "~swot\\BAM_control\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
 BAM_control <- ldply(BAM_control, read_csv)
 BAM_control$river <- files
 colnames(BAM_control) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
 BAM_control$Type <- rep('BAM_control', nrow(BAM_control))
 BAM_control$order <- rep(1, nrow(BAM_control))
 
-geoBAM_expert = list.files(paste(output_directory, "swot_independent_test\\geoBAM_expert\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
+geoBAM_expert = list.files(paste(output_directory, "~swot\\geoBAM_expert\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
 geoBAM_expert <- ldply(geoBAM_expert, read_csv)
 geoBAM_expert$river <- files
 colnames(geoBAM_expert) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'AMHGflag', 'rivClass_1', 'rivClass_2',
@@ -225,7 +241,7 @@ colnames(geoBAM_expert) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'AMHGfla
 geoBAM_expert$Type <- rep('geoBAM_expert', nrow(geoBAM_expert))
 geoBAM_expert$order <- rep(1, nrow(geoBAM_expert))
 
-geoBAM_unsupervised = list.files(paste(output_directory, "swot_independent_test\\geoBAM_unsupervised\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
+geoBAM_unsupervised = list.files(paste(output_directory, "~swot\\geoBAM_unsupervised\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
 geoBAM_unsupervised <- ldply(geoBAM_unsupervised, read_csv)
 geoBAM_unsupervised$river <- files
 colnames(geoBAM_unsupervised) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'AMHGflag', 'rivClass_1', 'rivClass_2',
@@ -237,15 +253,18 @@ geoBAM_unsupervised$order <- rep(1, nrow(geoBAM_unsupervised))
 
 plot <- data.frame('geoBAM_expert' = geoBAM_expert$NSE, 'BAM' = BAM_control$NSE, 'geoBAM_unsupervised' = geoBAM_unsupervised$NSE, 'river' = geoBAM_expert$river)
 
+#Calculate increase in NSE
 SWOT_improvement <- data.frame('increaseNSE' = (plot$geoBAM_unsupervised - plot$BAM))
 SWOT_improvement$improve <- ifelse(SWOT_improvement$increaseNSE >= 0.1, 1, 0) #for paper results
 
 SWOT <- gather(plot, 'key', 'value', c('geoBAM_expert', 'geoBAM_unsupervised', 'BAM'))
 
+#Calculate number rivers not plotted
 not_plottedNSE <- SWOT %>% group_by(key) %>%
   filter(value < -2.3) %>%
   summarise(num_outliers = n())
 
+#Create figure subplots
 SWOT_boxplots <- ggplot(SWOT, aes(x=key, y=value)) + 
   geom_boxplot(aes(fill=key), size=0.8) + 
   coord_cartesian(ylim=c(-2.3,1))+
@@ -283,13 +302,13 @@ SWOT_hist_improvement <- ggplot(SWOT_improvement, aes(x=increaseNSE)) +
   ylab('Count') +
   coord_cartesian(xlim=c(-1,3))+ #preserve histogram boxes with 1 river not plotted
   geom_segment(aes(x=-0.5, y=2, xend=-1, yend=2), arrow = arrow(), size=1) +
-  geom_text(x=-0.75, y=2.5, label="1", size=6) + #St. Lawrence Downstream isn't plotted, so note it.
+  geom_text(x=-0.75, y=2.5, label="1", size=6) + 
   theme(axis.title.x = element_text(size=20),
         axis.text.x = element_text(size=17),
         axis.title.y = element_text(size=20),
         axis.text.y = element_text(size=17))
 
-
+#Build and save figure
 gridSWOT <- plot_grid(SWOT_CDFs + theme(legend.position = 'none'),
                            SWOT_boxplots + theme(legend.position = 'none'),
                            SWOT_hist_improvement + theme(legend.position = 'none'),
@@ -303,13 +322,13 @@ legend <- get_legend(SWOT_boxplots +
 plotSWOT <- plot_grid(gridSWOT)
 plotSWOT <- plotSWOT + draw_grob(legend, 0.675, -0.225, 0.25, 1)
 plotSWOT
-save_plot("C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\swot.png", plotSWOT, ncol=2, base_height = 8.5, base_width = 5.5)
+save_plot("Figure_5.png", plotSWOT, ncol=2, base_height = 8.5, base_width = 5.5)
 
 
 
 
-#Parametric distributions figure-----------------------------------------------------------------
-training2='C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\priors\\final_priors\\'
+#Figure 7-----------------------------------------------------------------
+training2='file path to priors data (i.e. results from classification jupyter notebook'
 setwd(training2)
 
 #Palettes
@@ -318,7 +337,7 @@ mycolors <- c(mycolors, 'black') #and big rivers
 mycolors2 <- brewer.pal(7, "Spectral") #7 classes
 mycolors2 <- c(mycolors2, 'black') #and unclassified rivers
 
-#A0
+#A0 prior distributions
 A0parameters <- read.csv('priorsA0_geoBAMexpert.csv')
 A0parameters <- A0parameters[order(A0parameters$clusterGeomorphIndex),]
 globalA0 <- read.csv('priorsA0.csv')
@@ -389,7 +408,7 @@ A0_DBSCAN <- ggplot(data.frame(logA0 = c(globalA0[3,2], globalA0[7,2])), aes(x =
   xlab('log A0 [m2]') +
   ylab('Cummulative Probability')
 
-#r
+#r prior distributions
 rparameters <- read.csv('priorsr_geoBAMexpert.csv')
 rparameters <- rparameters[order(rparameters$clusterGeomorphIndex),]
 globalr <- read.csv('priorsr.csv')
@@ -459,7 +478,7 @@ r_DBSCAN <- ggplot(data.frame(logr = c(globalr[3,2], globalr[7,2])), aes(x = log
   xlab('log r') +
   ylab('Cummulative Probability')
 
-#Wb
+#Wb prior distributions
 Wbparameters <- read.csv('priorsWb_geoBAMexpert.csv')
 Wbparameters <- Wbparameters[order(Wbparameters$clusterGeomorphIndex),]
 globalWb <- read.csv('priorsWb.csv')
@@ -530,7 +549,7 @@ Wb_DBSCAN <- ggplot(data.frame(logWb = c(globalWb[3,2], globalWb[7,2])), aes(x =
   xlab('log Wb [m]') +
   ylab('Cummulative Probability')
 
-#Db
+#Db prior distributions
 Dbparameters <- read.csv('priorsDb_geoBAMexpert.csv')
 Dbparameters <- Dbparameters[order(Dbparameters$clusterGeomorphIndex),]
 globalDb <- read.csv('priorsDb.csv')
@@ -601,7 +620,7 @@ Db_DBSCAN <- ggplot(data.frame(logDb = c(globalDb[3,2], globalDb[7,2])), aes(x =
   xlab('log Db [m]') +
   ylab('Cummulative Probability')
 
-#n
+#n prior distributions
 nparameters <- read.csv('priorsn_geoBAMexpert.csv')
 nparameters <- nparameters[order(nparameters$clusterGeomorphIndex),]
 globaln <- read.csv('priorsn.csv')
@@ -672,7 +691,7 @@ n_DBSCAN <- ggplot(data.frame(logn = c(globaln[3,2], globaln[7,2])), aes(x = log
   xlab('log n') +
   ylab('Cummulative Probability')
 
-#b
+#b prior distributions
 bparameters <- read.csv('priorsb_geoBAMexpert.csv')
 bparameters <- bparameters[order(bparameters$clusterGeomorphIndex),]
 globalb <- read.csv('priorsb.csv')
@@ -743,6 +762,7 @@ b_DBSCAN <- ggplot(data.frame(logb = c(globalb[3,2], globalb[7,2])), aes(x = log
   xlab('log b') +
   ylab('Cummulative Probability')
 
+#Collect prior subplots
 plotgrid <- plot_grid(A0_DBSCAN + theme(legend.position='none', axis.title.y = element_blank(), axis.title.x=element_text(size=18,face="bold")),
                       A0_expert + theme(legend.position='none', axis.title.y = element_blank(), axis.title.x=element_text(size=18,face="bold")),
                       Wb_DBSCAN + theme(legend.position='none', axis.title.y = element_blank(), axis.title.x=element_text(size=18,face="bold")),
@@ -759,10 +779,11 @@ plotgrid <- plot_grid(A0_DBSCAN + theme(legend.position='none', axis.title.y = e
 
 yTitleCombo <- textGrob('Cummulative Probability', gp=gpar(fontface="bold", col="black", fontsize=20), rot=90)
 
+#Build figure and save
 plotgrid <- arrangeGrob(plotgrid, left = yTitleCombo)
-ggsave('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\prior_distributions.png', plotgrid, width = 13, height = 15)
+ggsave('Figure_7.png', plotgrid, width = 13, height = 15)
 
-#T-tests
+#Anovas for manuscript
 A0parameters.aov <- summary(aov(X50. ~ clusterGeomorphIndex, data = A0parameters))[[1]][[1,"Pr(>F)"]]
 A0parametersDBSCAN.aov <- summary(aov(X50. ~ cluster, data = A0parametersDBSCAN))[[1]][[1,"Pr(>F)"]]
 
@@ -790,17 +811,18 @@ anova_results <- data.frame('A0'=c(A0parameters.aov, A0parametersDBSCAN.aov),
 
 rownames(anova_results) <- c('Expert', 'Unsupervised')
 
-#MERIT Hydro map---------------------------------------------
-widthsClass <- read.table('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\priors\\final_priors\\WidthsClass_geoBAMexpert.csv', sep=',', header=TRUE)
+#Figure 2b. THIS WILL TAKE NEARLY AN HOUR TO OUTPUT---------------------------------------------
+widthsClass <- read.table('file path to priors\\WidthsClass_geoBAMexpert.csv', sep=',', header=TRUE)
 classes <- widthsClass$X50.
-widthsMatrix <- load('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Mackenzie\\width_bam.Rdata')
+widthsMatrix <- load('file path to Mackenzie\\widths.Rdata')
 widthsMatrix <- group_by(width_bam, reach, Date) %>% summarise(reachAvgWidth = mean(width))
 widthsMatrix <- filter(widthsMatrix, reachAvgWidth > 0)
 widthsMatrix2 <- group_by(widthsMatrix, reach) %>% summarise(logSD = sd(log(reachAvgWidth), na.rm=TRUE), mean = mean(log(reachAvgWidth), na.rm=TRUE), median = median(reachAvgWidth))
 colnames(widthsMatrix2) <- c('COMID', 'logSD', 'logMean', 'median')
 
-maxWidth = 6.5 #from training data,
+maxWidth = 6.5 #from training data
 
+#run geoBAM-Expert classification, directly copied from geoBAMr
 classify_geomorph <- function(sd, mean){
   if (is.finite(mean) == 0 || is.na(mean)==1) {
     return(1)
@@ -812,6 +834,7 @@ classify_geomorph <- function(sd, mean){
   }
 }
 
+#run geoBAM-Unsupervised, directly copied from geoBAMr
 classify_func_unsupervised <- function(width) {
   #One-vs-Rest Logistic regression model
   #test set accuracy rate of 87%
@@ -831,29 +854,23 @@ classify_func_unsupervised <- function(width) {
   return(index)
 }
 
-meritHYDRO <- st_read('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Mackenzie\\Mackenzie_rivers.shp')
-lakes <- st_read('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Mackenzie\\clip_lakes.shp')
-shield <- st_read('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Mackenzie\\CA_shield.shp')
+meritHYDRO <- st_read('file path to MERIT Hydro shapefile for Mackenzie basin')
+lakes <- st_read('file path to lakes shapefile for map')
+shield <- st_read('file path to Canadian Shield shapefile for map')
 shield <- st_transform(shield, crs(meritHYDRO))
-basemap <- brick('C:\\Users\\craig\\Box Sync\\Datasets\\NE1_50M_SR_W\\NE1_50M_SR_W\\NE1_50M_SR_W.tif')
+basemap <- brick('file path to raster basemap for map')
 
-#temp <- meritHYDRO$width_mean
 meritHYDRO <- left_join(meritHYDRO, widthsMatrix2, by='COMID')
-#meritHYDRO <- filter(meritHYDRO, is.na(median)==0)
 output <- as.vector(1:nrow(meritHYDRO))
 output2 <- as.vector(1:nrow(meritHYDRO))
 for (i in 1:nrow(meritHYDRO)) {
   class <- classify_geomorph(meritHYDRO$logSD[i], log(meritHYDRO$width_mean[i]))
   output[i] <- class
-  
- # class <- classify_func_unsupervised(meritHYDRO$median[i])
-#  output2[i] <- class
 }
 
 meritHYDRO$geomorph_class <- output
-#meritHYDRO$unsupervised_class <- output2
 
-#Validation NSE
+#Validation NSE for map
 stats <- group_by(mackenzie, reach) %>% 
   summarise(NSE_expert = NSE(geoBAM_expert_mean, obs_Q, na.rm=TRUE), 
             NSE_unsupervised = NSE(geoBAM_unsupervised_mean, obs_Q, na.rm=TRUE), 
@@ -861,11 +878,12 @@ stats <- group_by(mackenzie, reach) %>%
             n = n())
 
 #convert Dongmei IDs to COMIDs
-load('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Mackenzie\\hrridMap.Rdata')
+load('file path to ID map to convert internal IDs to MERIT Hydro COMIDS')
 hrridMap <- as.data.frame(hrridMap)
 hrridMap$COMID <- rownames(hrridMap)
 colnames(hrridMap) <- c('reach', 'COMID')
 
+#Joining NSEs to data
 stats$reach <- as.numeric(stats$reach)
 stats <- left_join(stats, hrridMap, by='reach')
 stats$COMID <- as.numeric(stats$COMID)
@@ -876,15 +894,17 @@ plotNetwork$expert_imp <- (plotNetwork$NSE_expert - plotNetwork$NSE_BAM)
 plotNetwork$unsupervised_imp <- (plotNetwork$NSE_unsupervised - plotNetwork$NSE_BAM)
 plotNetwork <- plotNetwork[order(plotNetwork$expert_imp),] 
 
+#Filter out widths of 0m
 meritHYDRO <- filter(meritHYDRO, width_mean > 0)
 
+#Map bounding box
 hydroBox <- st_bbox(meritHYDRO)
 
 #Palette with black for global
 mycolors <- colorRampPalette(brewer.pal(11, "Spectral"))(17)
 mycolors <- c(mycolors, '#d94801')
 
-#Make map
+#Make map using tmap R package
 places <- data.frame(lon = c(-113.4938, -135.0568),
                  lat = c(53.5461, 60.7212),
                  Name= c("Edmonton", "Whitehorse"))
@@ -917,11 +937,11 @@ base <- tm_shape(basemap, bbox=hydroBox) +
   tm_rgb(alpha=0.90, legend.show = FALSE)
 
 mapfin <- base + map + mapLakes + mapShield + bubbles + mapPlaces + tm_layout(legend.outside = TRUE)
-tmap_save(mapfin, 'C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\mackenzie_map.png')
+tmap_save(mapfin, 'Figure_2b.png')
 
 
-#Widths as predictor of expert river types plot----------------------------------------------
-setwd('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\priors\\final_priors\\')
+#Figure 2a----------------------------------------------
+setwd('file path to priors')
 widthClasses <- read.csv('expert_river_widths.csv')
 mycolors <- colorRampPalette(brewer.pal(11, "Spectral"))(16)
 widthClassplot <- ggplot(widthClasses, aes(x=as.factor(clusterGeomorphIndex), y=logchan_width, fill=as.factor(clusterGeomorphIndex))) +
@@ -931,25 +951,26 @@ widthClassplot <- ggplot(widthClasses, aes(x=as.factor(clusterGeomorphIndex), y=
   scale_fill_manual(values=mycolors, breaks = c('1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16'), name='Expert River Type') +
   theme(legend.position = 'none',
         axis.title=element_text(size=18,face="bold"))
-ggsave('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\widthsClassexpert.png', widthClassplot, height=8, width=4)
+ggsave('Figure_2a.png', widthClassplot, height=8, width=4)
 
 
-#NSE by stream order supp fig-----------------------------------------------------
+#Figure S7-----------------------------------------------------
 plot <- ggplot(plotNetwork, aes(x=factor(order), y= expert_imp, fill=factor(order))) +
   geom_boxplot() +
-#  geom_jitter(shape=16, position=position_jitter(0.2), size=1.5) +
   scale_fill_brewer(palette = 'Dark2', name='Stream Order') +
   ylab('Increase in NSE') +
   xlab('Stream Order') +
   geom_hline(yintercept =0, linetype='dashed') +
   geom_hline(yintercept =  1, linetype='dashed')
-plot
+ggsave('Figure_S7.png', plot, height=8, width=4)
 
-#Mackenzie hydrographs---------------------------------------------------------
+#Figure 4---------------------------------------------------------
+#Mackenzie results should still be sitting in memory. Otherwise, build using code under 'Figure 3'
+#Functions for padding decimal places
 scaleFUN <- function(x) sprintf("%.2f", x)
 scaleFUN3 <- function(x) sprintf("%.1f", x)
 
-#Randomly grab 12 reaches for validation (3 from each NSE quartile)
+#Randomly sample 12 reaches for validation (3 from each NSE quartile)
 stats$NSE_imp <- stats$NSE_expert - stats$NSE_BAM
 quantiles <- quantile(stats$NSE_imp, c(0.33, 0.66))
 first_quart <- stats[stats$NSE_imp <= quantiles[1],]
@@ -968,7 +989,7 @@ colnames(mack_hydrographs) <- c('Date', 'reach', 'Observed Discharge', 'geoBAM-E
 mack_hydrographs$Date <- as.Date(mack_hydrographs$Date, '%m/%d/%Y')
 
 pltList <- list()
-
+#Build hydrographs
 for (i in 1:12){
   pltName <- paste('hydrograph_', sample[i], sep='')
   temp <- filter(mack_hydrographs, reach == sample[i])
@@ -987,6 +1008,7 @@ for (i in 1:12){
     ggtitle(sample[i])
 }
 
+#Wrangle subplots into desired format
 #subplots are referenced manually here to get the little, more, and most improvement plots to line up by column
 plotgrid <- plot_grid(pltList[[1]] + theme(legend.position='none', axis.text.x = element_blank(), axis.ticks.x = element_blank()),
                       pltList[[5]] + theme(legend.position='none', axis.text.x = element_blank(), axis.ticks.x = element_blank()),
@@ -1015,19 +1037,20 @@ plotHydrographs <- plotgrid + draw_grob(legend, 0.75, -0.48, 0.2, 1)
 yTitleCombo <- textGrob(expression(Discharge~(cms)), gp=gpar(fontface="bold", col="black", fontsize=19), rot=90)
 xTitleCombo <- textGrob(expression(Timestep/Max~Timestep), gp=gpar(fontface="bold", col="black", fontsize=19))
 
+#Build Figure and save
 plotHydrographs <- grid.arrange(arrangeGrob(plotHydrographs, left = yTitleCombo, bottom = xTitleCombo))
-ggsave('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\temp.png', plotHydrographs, width = 12, height = 10)
+ggsave('Figure_4.png', plotHydrographs, width = 12, height = 10)
 
-#All metrics plot---------------------------------------------
-#SWOT
-BAM_control = list.files(paste(output_directory, "swot_independent_test\\BAM_control\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
+#Figure 8---------------------------------------------
+#gather SWOT results (again)
+BAM_control = list.files(paste(output_directory, "~swot\\BAM_control\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
 BAM_control <- ldply(BAM_control, read_csv)
 BAM_control$river <- files
 colnames(BAM_control) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
 BAM_control$Type <- rep('BAM_control', nrow(BAM_control))
 BAM_control$order <- rep(1, nrow(BAM_control))
 
-geoBAM_expert = list.files(paste(output_directory, "swot_independent_test\\geoBAM_expert\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
+geoBAM_expert = list.files(paste(output_directory, "~swot\\geoBAM_expert\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
 geoBAM_expert <- ldply(geoBAM_expert, read_csv)
 geoBAM_expert$river <- files
 colnames(geoBAM_expert) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'AMHGflag', 'rivClass_1', 'rivClass_2',
@@ -1037,7 +1060,7 @@ colnames(geoBAM_expert) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'AMHGfla
 geoBAM_expert$Type <- rep('geoBAM_expert', nrow(geoBAM_expert))
 geoBAM_expert$order <- rep(1, nrow(geoBAM_expert))
 
-geoBAM_expert_soils = list.files(paste(output_directory, "swot_independent_test\\geoBAM_expert\\soil_test\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
+geoBAM_expert_soils = list.files(paste(output_directory, "~swot\\geoBAM_expert\\soil_test\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
 geoBAM_expert_soils <- ldply(geoBAM_expert_soils, read_csv)
 geoBAM_expert_soils$river <- files
 colnames(geoBAM_expert_soils) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'AMHGflag', 'rivClass_1', 'rivClass_2',
@@ -1047,7 +1070,7 @@ colnames(geoBAM_expert_soils) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'A
 geoBAM_expert_soils$Type <- rep('geoBAM_expert_soils', nrow(geoBAM_expert_soils))
 geoBAM_expert_soils$order <- rep(1, nrow(geoBAM_expert_soils))
 
-geoBAM_unsupervised = list.files(paste(output_directory, "swot_independent_test\\geoBAM_unsupervised\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
+geoBAM_unsupervised = list.files(paste(output_directory, "~swot\\geoBAM_unsupervised\\", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
 geoBAM_unsupervised <- ldply(geoBAM_unsupervised, read_csv)
 geoBAM_unsupervised$river <- files
 colnames(geoBAM_unsupervised) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'AMHGflag', 'rivClass_1', 'rivClass_2',
@@ -1057,16 +1080,17 @@ colnames(geoBAM_unsupervised) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'A
 geoBAM_unsupervised$Type <- rep('geoBAM_unsupervised', nrow(geoBAM_unsupervised))
 geoBAM_unsupervised$order <- rep(1, nrow(geoBAM_unsupervised))
 
-write.csv(geoBAM_unsupervised, 'C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\geoBAM_unsupervised.csv') #save results
-write.csv(geoBAM_expert, 'C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\geoBAM_expert.csv') #save results
-write.csv(BAM_control, 'C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\BAM_control.csv') #save results
+write.csv(geoBAM_unsupervised, 'results_geoBAM_unsupervised.csv') #save results
+write.csv(geoBAM_expert, 'results_geoBAM_expert.csv') #save results
+write.csv(BAM_control, 'results_BAM_control.csv') #save results
 
+#Keep only desired columns
 geoBAM_expert <- geoBAM_expert[,c(2:5,23,24)]
 geoBAM_expert_soils <- geoBAM_expert_soils[,c(2:5,23,24)]
 geoBAM_unsupervised <- geoBAM_unsupervised[,c(2:5,23,24)]
 BAM_control <- BAM_control[,-1]
 
-#Mackenzie
+#Gather Mackenzie results (should still be in memory)
 mackenzie_BAM <- group_by(mackenzie, reach) %>% 
   drop_na() %>%
   summarise(RRMSE =  sqrt(mean((BAM_mean - obs_Q)^2 / obs_Q^2)), 
@@ -1094,7 +1118,7 @@ mackenzie_unsupervised <- group_by(mackenzie, reach) %>%
             Type = 'Mackenzie_unsupervised')
 colnames(mackenzie_unsupervised) <- c('river', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'Type')
 
-#plot
+#Combine all results into single dataframe
 bam_stats <- rbind(BAM_control, geoBAM_unsupervised, geoBAM_expert, mackenzie_BAM, mackenzie_unsupervised, mackenzie_expert)
 
 plot <- gather(bam_stats, 'metric', 'value', c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
@@ -1103,8 +1127,10 @@ plot$metric <- factor(plot$metric, levels=c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
 
 stats <- group_by(plot, Type, metric) %>% dplyr::summarize(mean = mean(value), median = median(value), IQR = IQR(value))
 
-write.csv(stats, 'C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\outputs\\final_results\\summ_stats.csv') #save results
+#Save summary stats results
+write.csv(stats, 'results_summ_stats.csv') #save results
 
+#Get outliying rivers not plotted
 not_plottedNSE <- plot %>% group_by(Type, metric) %>%
   filter(metric == 'NSE') %>%
   summarise(num_outliers = sum(value < -2.3))
@@ -1113,6 +1139,7 @@ not_plottedOthers <- plot %>% group_by(Type, metric) %>%
   filter(metric != 'NSE') %>%
   summarise(num_outliers = sum(value > 2))
 
+#Plot Figure
 boxplots <- ggplot(plot, aes(x=metric, y = value, fill=Type)) +
   geom_boxplot() + 
   coord_cartesian(ylim = c(-2.3, 2))+
@@ -1128,227 +1155,4 @@ boxplots <- ggplot(plot, aes(x=metric, y = value, fill=Type)) +
                     labels = c("SWOT BAM", 'SWOT geoBAM-Unsupervised', 'SWOT geoBAM-Expert', 'Mackenzie BAM', 'Mackenzie geoBAM-Unsupervised', 'Mackenzie geoBAM-Expert'), 
                     values=c('#6baed6', '#2171b5', '#08519c', '#74c476', '#238b45', '#006d2c'))
 
-ggsave('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\boxplots_compare.png', boxplots, dpi = 400, width = 6.5, height = 6.5)
-
-#Soils classification test
-bam_stats_soils <- rbind(BAM_control, geoBAM_expert, geoBAM_expert_soils)
-
-plot_soils <- gather(bam_stats_soils, 'metric', 'value', c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
-plot_soils$Type <- factor(plot_soils$Type, levels = c('BAM_control', 'geoBAM_expert', 'geoBAM_expert_soils'))
-plot_soils$metric <- factor(plot_soils$metric, levels=c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
-
-not_plottedNSE <- plot_soils %>% group_by(Type, metric) %>%
-  filter(metric == 'NSE') %>%
-  summarise(num_outliers = sum(value < -2.3))
-
-not_plottedOthers <- plot_soils %>% group_by(Type, metric) %>%
-  filter(metric != 'NSE') %>%
-  summarise(num_outliers = sum(value > 2))
-
-boxplots <- ggplot(plot_soils, aes(x=metric, y = value, fill=Type)) +
-  geom_boxplot() + 
-  geom_text(data=not_plottedNSE, aes(y=-2.43,label=num_outliers), size=5,hjust=0.5, position = position_dodge(width=0.85)) +
-  geom_text(data=not_plottedOthers,aes(y=2.15,label=num_outliers), size=5, hjust=0.7, position = position_dodge(width = 0.85)) +
-  coord_cartesian(ylim = c(-2.3, 2))+
-  geom_hline(yintercept=0, linetype='dashed') +
-  geom_hline(yintercept=0.5, linetype='dashed') +
-  geom_hline(yintercept=1, linetype='dashed') +
-  ylab('Metric Value') +
-  xlab('') +
-  theme(legend.position= c(0.01, 0.27)) +
-  scale_fill_manual(name = "", 
-                    labels = c("SWOT-Control", 'SWOT-Expert', 'SWOT-Expert w/ soils'),
-                    values=c('#6baed6', '#2171b5', '#08519c', 'grey'))
-boxplots
-ggsave('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\updates_review1\\soils_test.png', boxplots, dpi = 400, width = 6.5, height = 6.5)
-
-
-
-#Space-varying vs Time-and-space varying Manning's n for supplement-----------------------
-output_directory=paste('C://Users//craig//Box Sync//Ongoing Projects//geomorph_class//outputs//')
-
-new_new_regime = list.files(paste(output_directory, "old//new_physics_new_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-new_new_regime <- ldply(new_new_regime, read_csv)
-new_new_regime$river <- phase_files
-colnames(new_new_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_new_regime$Type <- rep('New_new_regime', nrow(new_new_regime))
-new_new_regime$order <- rep(5, nrow(new_new_regime))
-new_new_regime <- filter(new_new_regime, river %in% files)
-
-varyingN = list.files(paste(output_directory, "old//new_physics_new_priors_varyingN//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-varyingN <- ldply(varyingN, read_csv)
-varyingN$river <- phase_files
-colnames(varyingN) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-varyingN$Type <- rep('Time-and-space varying n', nrow(varyingN))
-varyingN$order <- rep(5, nrow(varyingN))
-
-bam_stats <- rbind(new_new_regime, varyingN)
-plot <- gather(bam_stats, 'metric', 'value', c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
-plot$Type <- factor(plot$Type, levels = c('New_new_regime', 'Time-and-space varying n'))
-
-plot$metric <- factor(plot$metric, levels=c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
-
-#just pepsi 1
-pepsi1 <- phase_files[c(2,3,4,7, 9,10,14, 23, 24, 25, 26, 27, 30, 31, 32, 33, 34)]
-plot <- filter(plot, river %in% pepsi1)
-
-
-cdf <- ggplot(filter(plot, metric=='NSE'), aes(x=value, color=Type)) +
-  stat_ecdf(size=2) +
-  scale_color_brewer(palette = 'Dark2', 
-                    labels=c('Space-varying n', 'Space-and-time-varying n')) +
-  geom_vline(xintercept=0, linetype='dashed', size=1) +
-  xlab('NSE') +
-  ylab('Density')
-cdf  
-ggsave('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\supp\\n_cdf.tiff', cdf, dpi = 400, width = 6.5, height = 6.5)
-
-
-
-
-
-
-#---------------------------------------------------
-#
-#Pepsi boxplots---------------------------------------------------------------------------------------------------
-output_directory=paste('C://Users//craig//Box Sync//Ongoing Projects//geomorph_class//outputs//')
-
-mark_switch = list.files(paste(output_directory, "old_physics_old_priors_mark_switch//", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
-mark_switch <- ldply(mark_switch, read_csv)
-mark_switch$river <- phase_files
-colnames(mark_switch) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-mark_switch$Type <- rep('Mark_Switch', nrow(mark_switch))
-mark_switch$order <- rep(1, nrow(mark_switch))
-
-old_old_regime = list.files(paste(output_directory, "old_physics_old_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.x
-old_old_regime <- ldply(old_old_regime, read_csv)
-old_old_regime$river <- phase_files
-colnames(old_old_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-old_old_regime$Type <- rep('Old_old_regime', nrow(old_old_regime))
-old_old_regime$order <- rep(2, nrow(old_old_regime))
-
-old_new_regime = list.files(paste(output_directory, "old_physics_new_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-old_new_regime <- ldply(old_new_regime, read_csv)
-old_new_regime$river <- phase_files
-colnames(old_new_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-old_new_regime$Type <- rep('Old_new_regime', nrow(old_new_regime))
-old_new_regime$order <- rep(3, nrow(old_new_regime))
-
-new_old_regime = list.files(paste(output_directory, "new_old_fin_reachN//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-new_old_regime <- ldply(new_old_regime, read_csv)
-new_old_regime$river <- phase_files
-colnames(new_old_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_old_regime$Type <- rep('New_old_regime', nrow(new_old_regime))
-new_old_regime$order <- rep(4, nrow(new_old_regime))
-
-new_new_geomorph = list.files(paste(output_directory, "geoBAM//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-new_new_geomorph <- ldply(new_new_geomorph, read_csv)
-new_new_geomorph$river <- phase_files
-colnames(new_new_geomorph) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_new_geomorph$Type <- rep('new_new_Geomorph', nrow(new_new_geomorph))
-new_new_geomorph$order <- rep(5, nrow(new_new_geomorph))
-
-new_new_dbscan = list.files(paste(output_directory, "new_new_reachN_DBSCAN_20_Class_all_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-new_new_dbscan <- ldply(new_new_dbscan, read_csv)
-new_new_dbscan$river <- phase_files
-colnames(new_new_dbscan) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_new_dbscan$Type <- rep('DBSCAN', nrow(new_new_dbscan))
-new_new_dbscan$order <- rep(5, nrow(new_new_dbscan))
-
-new_new_regime = list.files(paste(output_directory, "old//new_physics_new_priors//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-new_new_regime <- ldply(new_new_regime, read_csv)
-new_new_regime$river <- phase_files
-colnames(new_new_regime) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-new_new_regime$Type <- rep('New_new_regime', nrow(new_new_regime))
-new_new_regime$order <- rep(5, nrow(new_new_regime))
-new_new_regime <- filter(new_new_regime, river %in% files)
-
-varyingN = list.files(paste(output_directory, "old//new_physics_new_priors_varyingN//", sep=''), pattern="*.csv", full.names = TRUE) #switch.y
-varyingN <- ldply(varyingN, read_csv)
-varyingN$river <- phase_files
-colnames(varyingN) <- c('order', 'RRMSE', 'NRMSE', 'NSE', 'rBIAS', 'river')
-varyingN$Type <- rep('Time-and-space varying n', nrow(varyingN))
-varyingN$order <- rep(5, nrow(varyingN))
-
-bam_stats <- rbind(new_new_regime, varyingN)
-#bam_stats <- rbind(mark_switch, new_new_dbscan, new_new_geomorph)
-plot <- gather(bam_stats, 'metric', 'value', c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
-plot$Type <- factor(plot$Type, levels = c('New_new_regime', 'Time-and-space varying n'))
-#plot$Type <- factor(plot$Type, levels = c('Mark_Switch', 'DBSCAN', 'new_new_Geomorph'))
-
-plot$metric <- factor(plot$metric, levels=c('RRMSE', 'NRMSE', 'NSE', 'rBIAS'))
-
-#just pepsi 1
-pepsi1 <- phase_files[c(2,3,4,7, 9,10,14, 23, 24, 25, 26, 27, 30, 31, 32, 33, 34)]
-plot <- filter(plot, river %in% pepsi1)
-#plot <- filter(plot, metric == 'NSE')
-
-stats <- group_by(plot, Type, metric) %>% dplyr::summarize(mean = mean(value), median = median(value), IQR = IQR(value))
-
-not_plottedNSE <- plot %>% group_by(Type, metric) %>%
-  filter(value < -2.15) %>%
-  summarise(num_outliers = n())
-
-not_plottedOthers <- plot %>% group_by(Type, metric) %>%
-  filter(value > 1.4) %>%
-  summarise(num_outliers = n())
-
-boxplots <- ggplot(plot, aes(x=metric, y = value, fill=Type)) +
-  geom_boxplot() + 
-  coord_cartesian(ylim = c(-2, 1.25))+
-  geom_text(data=not_plottedNSE,aes(y=-2*0.99,label=num_outliers), size=5,vjust=1.5,hjust=-0.5, position = position_dodge2(width=0.8)) +
-  geom_text(data=not_plottedOthers,aes(y=1.25*0.99,label=num_outliers), size=5,vjust=1.5,hjust=-0.5, position = position_dodge2(width = 0.8)) +
-  geom_hline(yintercept=0, linetype='dashed') +
-  geom_hline(yintercept=0.5, linetype='dashed') +
-  geom_hline(yintercept=1, linetype='dashed') +
-  ylab('') +
-  xlab('%') +
-  theme(legend.position= c(0.01, 0.27)) + 
-  scale_fill_manual(name = "", 
-                    labels = c("Default/Control", "New AMHG, Old Data", 'Old AMHG, New Data', 'New AMHG, New Data', 'Unsupervised', 'Expert'), 
-                    values=c('#6baed6', '#bdbdbd', '#969696', '#737373', '#2171b5', '#08519c'))
-boxplots
-ggsave('C:\\Users\\craig\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\boxplots.tiff', boxplots, dpi = 400, width = 6.5, height = 6.5)
-
-
-#-------------------------------------------------Scraps
-#
-#Scraps
-
-plotHydrographs <- plot_grid(pltList$hydrograph_GaronneUpstream.csv + theme(legend.position='none', axis.text.x = element_blank(), axis.ticks.x = element_blank()) + scale_y_continuous(labels=scaleFUN) + ggtitle('Garonne Upstream'),
-                             pltList$hydrograph_Seine.csv + theme(legend.position='none', axis.text.x = element_blank(), axis.ticks.x = element_blank()) + scale_y_continuous(labels=scaleFUN) + ggtitle('Seine'),
-                             pltList$hydrograph_SacramentoUpstream.csv + theme(legend.position='none', axis.text.x = element_blank(), axis.ticks.x = element_blank()) + scale_y_continuous(labels=scaleFUN) + ggtitle('Sacramento Upstream'),
-                             NULL,
-                             pltList$hydrograph_GaronneUpstream.csv + theme(legend.position='none') + scale_y_continuous(labels=scaleFUN),
-                             pltList$hydrograph_Seine.csv + theme(legend.position='none') + scale_y_continuous(labels=scaleFUN),
-                             pltList$hydrograph_SacramentoUpstream.csv + theme(legend.position='none') + scale_y_continuous(labels=scaleFUN),
-                             NULL,
-                             ncol=4)
-
-legend <- get_legend(
-  # create some space to the left of the legend
-  pltList$hydrograph_GaronneUpstream.csv + theme(legend.text=element_text(size=17))
-)
-legend2 <- get_legend(
-  # create some space to the left of the legend
-  pltList$hydrograph_GaronneUpstream.csv + theme(legend.text=element_text(size=17))
-)
-
-text <- c('x better', 'x similar', 'x worse', 'y better', 'y similar', 'y worse')
-
-plotHydrographs <- plotHydrographs + 
-  draw_grob(legend, 0.75, 0.25, 0.25, 1) + 
-  draw_grob(legend2, 0.75, -0.25, 0.25, 1) + 
-  draw_text(text, x = c(0.15, 0.43, 0.7, 0.15, 0.43, 0.7), y = c(0.9, 0.9, 0.9, 0.45, 0.45, 0.45), hjust = 0)
-
-yTitleCombo <- textGrob(expression(Discharge/(Mean~Observed~Discharge)), gp=gpar(fontface="bold", col="black", fontsize=18), rot=90)
-xTitleCombo <- textGrob(expression(Timestep/Max~Timestep), gp=gpar(fontface="bold", col="black", fontsize=18))
-
-plotHydrographs <- grid.arrange(arrangeGrob(plotHydrographs, left = yTitleCombo, bottom = xTitleCombo))
-#ggsave('C:\\Users\\cbrinkerhoff\\Box Sync\\Ongoing Projects\\geomorph_class\\Figures\\paper_figures\\hydrographs_three.pdf', plotHydrographs, width = 14, height = 7)
-
-
-
-
-
-
+ggsave('Figure_8.png', boxplots, dpi = 400, width = 6.5, height = 6.5)
